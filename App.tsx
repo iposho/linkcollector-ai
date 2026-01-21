@@ -489,7 +489,7 @@ const App: React.FC = () => {
 
   if (status === AppStatus.SETTINGS) {
     return (
-      <div className="w-[450px] bg-white flex flex-col h-auto max-h-[600px]">
+      <div className="w-[450px] bg-white flex flex-col min-h-[100%]">
         <header className="px-5 py-4 bg-slate-900 text-white flex items-center gap-3">
           <button onClick={() => setStatus(AppStatus.IDLE)} className="p-2 hover:bg-white/10 rounded-lg">
             <ChevronLeft className="w-5 h-5" />
@@ -590,7 +590,7 @@ const App: React.FC = () => {
 
   if (status === AppStatus.SUCCESS) {
     return (
-      <div className="w-[450px] p-10 flex flex-col items-center justify-center bg-white h-auto">
+      <div className="w-[450px] p-10 flex flex-col items-center justify-center bg-white min-h-[600px]">
         <div className="bg-green-50 p-6 rounded-full mb-6 border border-green-100">
           <CheckCircle2 className="text-green-500 w-16 h-16" />
         </div>
@@ -608,7 +608,7 @@ const App: React.FC = () => {
 
   if (status === AppStatus.LIST) {
     return (
-      <div className="w-[450px] h-auto max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
+      <div className="w-[450px] min-h-[600px] max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
         <header className="px-5 py-4 bg-indigo-600 text-white flex items-center gap-3 shadow-lg">
           <button onClick={() => setStatus(AppStatus.IDLE)} className="p-2 hover:bg-white/10 rounded-lg">
             <ChevronLeft className="w-5 h-5" />
@@ -717,7 +717,7 @@ const App: React.FC = () => {
 
   if (status === AppStatus.EDITING) {
     return (
-      <div className="w-[450px] h-auto max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
+      <div className="w-[450px] min-h-[600px] max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
         <header className="px-5 py-4 bg-indigo-600 text-white flex items-center gap-3 shadow-lg">
           <button onClick={() => { setStatus(AppStatus.LIST); setEditingLink(null); }} className="p-2 hover:bg-white/10 rounded-lg">
             <ChevronLeft className="w-5 h-5" />
@@ -866,7 +866,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="w-[450px] h-auto max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
+    <div className="w-[450px] min-h-[100%] bg-white flex flex-col overflow-hidden border border-slate-100">
       <header className="px-5 py-4 bg-indigo-600 text-white flex justify-between items-center shadow-lg relative z-10">
         <div className="flex items-center gap-2.5">
           <Globe className="w-5 h-5 opacity-80" />
