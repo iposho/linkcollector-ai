@@ -7,6 +7,18 @@ export interface PageMetadata {
   favicon: string;
 }
 
+export interface SavedLink {
+  date: string;
+  url: string;
+  title: string;
+  description: string;
+  category: string;
+  tags: string[];
+  notes: string;
+  image: string;
+  icon: string;
+}
+
 export interface AppSettings {
   spreadsheetId: string;
   scriptUrl: string; // URL для Google Apps Script Web App
@@ -22,5 +34,7 @@ export enum AppStatus {
   SUCCESS = 'SUCCESS',
   ERROR = 'ERROR',
   ALREADY_EXISTS = 'ALREADY_EXISTS',
-  SETTINGS = 'SETTINGS'
+  SETTINGS = 'SETTINGS',
+  LIST = 'LIST',
+  EDITING = 'EDITING'
 }

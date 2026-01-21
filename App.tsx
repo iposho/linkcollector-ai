@@ -19,7 +19,7 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { PageMetadata, AppStatus, AppSettings } from './types';
+import { PageMetadata, AppStatus, AppSettings, SavedLink } from './types';
 import { analyzePageContent } from './services/cerebrasService';
 
 declare const chrome: any;
@@ -36,6 +36,9 @@ const App: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [savedLinks, setSavedLinks] = useState<SavedLink[]>([]);
+  const [editingLink, setEditingLink] = useState<SavedLink | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const [categories, setCategories] = useState<string[]>(() => {
     const saved = localStorage.getItem('categories');
@@ -266,11 +269,19 @@ const App: React.FC = () => {
         }
       }
 
+      const savedUrls = getSavedUrls();
+      const wasAlreadySaved = savedUrls.includes(metadata.url);
+      
+      // Определяем действие: если ссылка уже существует, обновляем, иначе создаем
+      const action = wasAlreadySaved ? 'update' : 'create';
+      
       const response = await fetch(settings.scriptUrl, {
         method: 'POST',
         mode: 'no-cors', // Важно для Apps Script Web App
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: action,
+          url: metadata.url,
           ...metadata,
           image: imageBase64, // Отправляем base64 версию
           category,
@@ -279,14 +290,12 @@ const App: React.FC = () => {
           timestamp: new Date().toISOString()
         })
       });
-
-      const savedUrls = getSavedUrls();
-      const wasAlreadySaved = savedUrls.includes(metadata.url);
       
-      // Удаляем URL если он уже был, чтобы избежать дубликатов, затем добавляем снова
-      const updatedUrls = savedUrls.filter(url => url !== metadata.url);
-      updatedUrls.push(metadata.url);
-      localStorage.setItem('saved_links', JSON.stringify(updatedUrls));
+      // Обновляем локальный список ссылок
+      if (!wasAlreadySaved) {
+        const updatedUrls = [...savedUrls, metadata.url];
+        localStorage.setItem('saved_links', JSON.stringify(updatedUrls));
+      }
       
       setStatus(AppStatus.SUCCESS);
     } catch (err) {
@@ -325,6 +334,156 @@ const App: React.FC = () => {
       alert('Кэш успешно очищен!');
     }
   };
+
+  const loadSavedLinks = async () => {
+    if (!settings.scriptUrl) {
+      setError("Укажите Script URL в настройках");
+      return;
+    }
+    
+    try {
+      setStatus(AppStatus.EXTRACTING);
+      const response = await fetch(settings.scriptUrl, {
+        method: 'GET'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch links');
+      }
+      
+      const result = await response.json();
+      if (result.success) {
+        setSavedLinks(result.data || []);
+        setStatus(AppStatus.LIST);
+      } else {
+        throw new Error(result.error || 'Failed to load links');
+      }
+    } catch (err: any) {
+      setError(err.message || "Ошибка при загрузке списка ссылок");
+      setStatus(AppStatus.ERROR);
+    }
+  };
+
+  const deleteLink = async (url: string) => {
+    if (!settings.scriptUrl) {
+      setError("Укажите Script URL в настройках");
+      return;
+    }
+    
+    if (!confirm('Вы уверены, что хотите удалить эту ссылку?')) {
+      return;
+    }
+    
+    try {
+      // Сначала обновляем локальный список для мгновенной обратной связи
+      const savedUrls = getSavedUrls();
+      const updatedUrls = savedUrls.filter(u => u !== url);
+      localStorage.setItem('saved_links', JSON.stringify(updatedUrls));
+      
+      // Обновляем список ссылок в UI
+      setSavedLinks(savedLinks.filter(link => link.url !== url));
+      
+      // Отправляем запрос на удаление в Google Sheets
+      const response = await fetch(settings.scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          url: url
+        })
+      });
+      
+      // При mode: 'no-cors' мы не можем прочитать ответ, но запрос отправлен
+      // Перезагружаем список через небольшую задержку для синхронизации
+      setTimeout(() => {
+        loadSavedLinks();
+      }, 500);
+      
+    } catch (err) {
+      setError("Ошибка при удалении ссылки");
+      // В случае ошибки перезагружаем список, чтобы синхронизировать состояние
+      setTimeout(() => {
+        loadSavedLinks();
+      }, 500);
+    }
+  };
+
+  const startEditing = (link: SavedLink) => {
+    setEditingLink(link);
+    setMetadata({
+      url: link.url,
+      title: link.title,
+      description: link.description,
+      image: link.image,
+      favicon: link.icon
+    });
+    setCategory(link.category);
+    setTags(link.tags);
+    setNotes(link.notes);
+    setStatus(AppStatus.EDITING);
+  };
+
+  const handleUpdate = async () => {
+    if (!metadata || !settings.scriptUrl || !editingLink) {
+      return;
+    }
+    
+    setStatus(AppStatus.SAVING);
+    try {
+      // Конвертируем изображение в base64, если нужно
+      let imageBase64 = metadata.image;
+      if (metadata.image && !metadata.image.startsWith('data:') && !metadata.image.includes('picsum.photos')) {
+        try {
+          imageBase64 = await imageToBase64(metadata.image);
+        } catch (err) {
+          console.warn('Не удалось конвертировать изображение в base64:', err);
+          imageBase64 = metadata.image;
+        }
+      }
+      
+      const response = await fetch(settings.scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          url: editingLink.url,
+          date: editingLink.date, // Сохраняем оригинальную дату
+          title: metadata.title,
+          description: metadata.description,
+          category: category,
+          tags: tags,
+          notes: notes,
+          image: imageBase64,
+          favicon: metadata.favicon
+        })
+      });
+      
+      // Перезагружаем список для синхронизации
+      setTimeout(() => {
+        loadSavedLinks();
+      }, 500);
+      
+      setStatus(AppStatus.SUCCESS);
+      setEditingLink(null);
+    } catch (err) {
+      setError("Ошибка при обновлении ссылки");
+      setStatus(AppStatus.IDLE);
+    }
+  };
+
+  const filteredLinks = savedLinks.filter(link => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      link.title.toLowerCase().includes(query) ||
+      link.description.toLowerCase().includes(query) ||
+      link.url.toLowerCase().includes(query) ||
+      link.category.toLowerCase().includes(query) ||
+      link.tags.some(tag => tag.toLowerCase().includes(query))
+    );
+  });
 
   if (status === AppStatus.SETTINGS) {
     return (
@@ -445,6 +604,221 @@ const App: React.FC = () => {
     );
   }
 
+  if (status === AppStatus.LIST) {
+    return (
+      <div className="w-[450px] h-auto max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
+        <header className="px-5 py-4 bg-indigo-600 text-white flex items-center gap-3 shadow-lg">
+          <button onClick={() => setStatus(AppStatus.IDLE)} className="p-2 hover:bg-white/10 rounded-lg">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h1 className="font-black text-lg flex-1">Мои ссылки</h1>
+          <button onClick={loadSavedLinks} className="p-2 hover:bg-white/10 rounded-lg" title="Обновить">
+            <Loader2 className="w-5 h-5" />
+          </button>
+        </header>
+        
+        <div className="p-4 bg-slate-50 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск по ссылкам..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <main className="flex-1 overflow-y-auto p-4 space-y-3">
+          {filteredLinks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+              <FolderOpen className="w-12 h-12 mb-4 opacity-20" />
+              <p className="text-sm font-bold text-center">
+                {searchQuery ? 'Ничего не найдено' : 'Нет сохраненных ссылок'}
+              </p>
+            </div>
+          ) : (
+            filteredLinks.map((link) => (
+              <div key={link.url} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-start gap-3">
+                  {link.image && (
+                    <img src={link.image} alt={link.title} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className="font-bold text-sm text-slate-800 line-clamp-2 flex-1">{link.title}</h3>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => startEditing(link)}
+                          className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Редактировать"
+                        >
+                          <SettingsIcon className="w-4 h-4 text-indigo-600" />
+                        </button>
+                        <button
+                          onClick={() => deleteLink(link.url)}
+                          className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono truncate mb-2">{link.url}</p>
+                    {link.description && (
+                      <p className="text-xs text-slate-600 line-clamp-2 mb-2">{link.description}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">
+                        {link.category}
+                      </span>
+                      {link.tags.slice(0, 3).map((tag, idx) => (
+                        <span key={idx} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px]">
+                          #{tag}
+                        </span>
+                      ))}
+                      {link.tags.length > 3 && (
+                        <span className="text-[10px] text-slate-400">+{link.tags.length - 3}</span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        onClick={() => window.open(link.url, '_blank')}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Открыть
+                      </button>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(link.date).toLocaleDateString('ru-RU')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </main>
+
+        <footer className="p-4 border-t bg-white">
+          <button
+            onClick={() => setStatus(AppStatus.IDLE)}
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors"
+          >
+            Вернуться к сохранению
+          </button>
+        </footer>
+      </div>
+    );
+  }
+
+  if (status === AppStatus.EDITING) {
+    return (
+      <div className="w-[450px] h-auto max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
+        <header className="px-5 py-4 bg-indigo-600 text-white flex items-center gap-3 shadow-lg">
+          <button onClick={() => { setStatus(AppStatus.LIST); setEditingLink(null); }} className="p-2 hover:bg-white/10 rounded-lg">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h1 className="font-black text-lg">Редактирование</h1>
+        </header>
+
+        <main className="flex-1 p-5 space-y-5 overflow-y-auto bg-slate-50/50">
+          {metadata && (
+            <>
+              <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+                <img src={metadata.image} className="w-full h-32 object-cover bg-slate-100" alt="Preview" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <img src={metadata.favicon} className="w-4 h-4" alt="ico" />
+                    <span className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]">{metadata.url}</span>
+                  </div>
+                  <h3 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight">{metadata.title}</h3>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
+                    <FolderOpen className="w-3 h-3" /> Категория
+                  </label>
+                  <div className="relative">
+                    <select 
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full px-4 py-3 pr-10 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm appearance-none"
+                    >
+                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
+                    <Tag className="w-3 h-3" /> Теги
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {tags.map(t => (
+                      <span key={t} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100 flex items-center gap-1.5">
+                        #{t.toUpperCase()}
+                        <button onClick={() => setTags(tags.filter(tag => tag !== t))} className="hover:text-red-500">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if(e.key === 'Enter' && newTag.trim()) {
+                          setTags([...new Set([...tags, newTag.trim()])]);
+                          setNewTag("");
+                        }
+                      }}
+                      placeholder="Добавить тег (Enter)..."
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <Plus className="absolute right-4 top-3.5 w-4 h-4 text-slate-300" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
+                    <Search className="w-3 h-3" /> Описание / Резюме
+                  </label>
+                  <textarea 
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm min-h-[100px] shadow-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
+                    placeholder="Добавьте свои заметки..."
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </main>
+
+        <footer className="p-5 border-t bg-white flex gap-3">
+          <button 
+            onClick={handleUpdate}
+            disabled={!metadata || status === AppStatus.SAVING}
+            className="flex-1 flex items-center justify-center gap-2.5 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm rounded-2xl shadow-xl transition-all active:scale-95"
+          >
+            {status === AppStatus.SAVING ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> СОХРАНИТЬ ИЗМЕНЕНИЯ</>}
+          </button>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="w-[450px] h-auto max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
       <header className="px-5 py-4 bg-indigo-600 text-white flex justify-between items-center shadow-lg relative z-10">
@@ -453,6 +827,9 @@ const App: React.FC = () => {
           <h1 className="font-black text-lg">LinkCollector AI</h1>
         </div>
         <div className="flex gap-2">
+          <button onClick={loadSavedLinks} className="p-2 hover:bg-white/20 rounded-xl transition-all" title="Мои ссылки">
+            <FolderOpen className="w-5 h-5" />
+          </button>
           <button onClick={() => setStatus(AppStatus.SETTINGS)} className="p-2 hover:bg-white/20 rounded-xl transition-all">
             <SettingsIcon className="w-5 h-5" />
           </button>

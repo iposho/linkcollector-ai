@@ -148,23 +148,10 @@ function doPost(e) {
                   SpreadsheetApp.getActiveSpreadsheet().insertSheet('Reading List');
     
     const data = JSON.parse(e.postData.contents);
-    
-    const row = [
-      new Date(),
-      data.url,
-      data.title,
-      data.description || '',
-      data.category || 'Прочее',
-      data.tags ? data.tags.join(', ') : '',
-      data.notes || '',
-      data.image || '',
-      data.favicon || ''
-    ];
-    
-    sheet.appendRow(row);
+    const action = data.action || 'create'; // create, update, delete
     
     // Установите заголовки, если это первая строка
-    if (sheet.getLastRow() === 1) {
+    if (sheet.getLastRow() < 1) {
       sheet.getRange(1, 1, 1, 9).setValues([[
         'date',
         'url',
@@ -177,6 +164,147 @@ function doPost(e) {
         'icon'
       ]]);
       sheet.getRange(1, 1, 1, 9).setFontWeight('bold');
+    }
+    
+    if (action === 'delete') {
+      // Удаление по URL
+      const urlToDelete = data.url;
+      if (!urlToDelete) {
+        throw new Error('URL is required for deletion');
+      }
+      
+      // Проверяем, что есть данные для удаления
+      if (sheet.getLastRow() < 2) {
+        return ContentService.createTextOutput(JSON.stringify({
+          success: false,
+          error: 'No data to delete'
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      const urlColumn = 2; // URL находится во второй колонке (B)
+      const lastRow = sheet.getLastRow();
+      const dataRange = sheet.getRange(2, urlColumn, lastRow - 1, 1);
+      const urls = dataRange.getValues();
+      
+      let deletedCount = 0;
+      // Идем с конца, чтобы индексы не сбивались при удалении
+      // Удаляем ВСЕ вхождения URL (на случай дубликатов)
+      for (let i = urls.length - 1; i >= 0; i--) {
+        if (urls[i][0] && urls[i][0].toString().trim() === urlToDelete.toString().trim()) {
+          sheet.deleteRow(i + 2); // +2 потому что начинаем со 2 строки (1 - заголовок) и индексы с 0
+          deletedCount++;
+        }
+      }
+      
+      if (deletedCount === 0) {
+        return ContentService.createTextOutput(JSON.stringify({
+          success: false,
+          error: 'Link not found'
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({success: true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    if (action === 'update') {
+      // Обновление существующей записи по URL
+      const urlToUpdate = data.url;
+      if (!urlToUpdate) {
+        throw new Error('URL is required for update');
+      }
+      
+      // Проверяем, что есть данные для обновления
+      if (sheet.getLastRow() < 2) {
+        throw new Error('No data to update');
+      }
+      
+      const urlColumn = 2;
+      const lastRow = sheet.getLastRow();
+      const dataRange = sheet.getRange(2, urlColumn, lastRow - 1, 1);
+      const urls = dataRange.getValues();
+      
+      let rowIndex = -1;
+      for (let i = 0; i < urls.length; i++) {
+        if (urls[i][0] && urls[i][0].toString().trim() === urlToUpdate.toString().trim()) {
+          rowIndex = i + 2; // +2 потому что начинаем со 2 строки (1 - заголовок) и индексы с 0
+          break;
+        }
+      }
+      
+      if (rowIndex === -1) {
+        throw new Error('Link not found');
+      }
+      
+      // Получаем оригинальную дату из существующей строки
+      const existingDate = sheet.getRange(rowIndex, 1).getValue();
+      
+      const row = [
+        existingDate || (data.date ? new Date(data.date) : new Date()), // Сохраняем оригинальную дату
+        data.url,
+        data.title,
+        data.description || '',
+        data.category || 'Прочее',
+        data.tags ? data.tags.join(', ') : '',
+        data.notes || '',
+        data.image || '',
+        data.favicon || ''
+      ];
+      
+      sheet.getRange(rowIndex, 1, 1, 9).setValues([row]);
+      
+      return ContentService.createTextOutput(JSON.stringify({success: true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Создание новой записи (по умолчанию)
+    // Сначала проверяем, не существует ли уже такая ссылка
+    const urlToCheck = data.url;
+    let existingRowIndex = -1;
+    
+    if (sheet.getLastRow() >= 2) {
+      const urlColumn = 2;
+      const lastRow = sheet.getLastRow();
+      const dataRange = sheet.getRange(2, urlColumn, lastRow - 1, 1);
+      const urls = dataRange.getValues();
+      
+      for (let i = 0; i < urls.length; i++) {
+        if (urls[i][0] && urls[i][0].toString().trim() === urlToCheck.toString().trim()) {
+          existingRowIndex = i + 2; // +2 потому что начинаем со 2 строки (1 - заголовок) и индексы с 0
+          break;
+        }
+      }
+    }
+    
+    if (existingRowIndex > 0) {
+      // Обновляем существующую запись вместо создания дубликата
+      const existingDate = sheet.getRange(existingRowIndex, 1).getValue();
+      const row = [
+        existingDate || new Date(), // Сохраняем оригинальную дату
+        data.url,
+        data.title,
+        data.description || '',
+        data.category || 'Прочее',
+        data.tags ? data.tags.join(', ') : '',
+        data.notes || '',
+        data.image || '',
+        data.favicon || ''
+      ];
+      sheet.getRange(existingRowIndex, 1, 1, 9).setValues([row]);
+    } else {
+      // Создаем новую запись
+      const row = [
+        new Date(),
+        data.url,
+        data.title,
+        data.description || '',
+        data.category || 'Прочее',
+        data.tags ? data.tags.join(', ') : '',
+        data.notes || '',
+        data.image || '',
+        data.favicon || ''
+      ];
+      sheet.appendRow(row);
     }
     
     return ContentService.createTextOutput(JSON.stringify({success: true}))
@@ -246,7 +374,25 @@ function doPost(e) {
 
 ### Просмотр сохранённых ссылок
 
-Все сохранённые ссылки можно просмотреть в вашей Google Таблице. Расширение автоматически создаст вкладку с указанным названием (по умолчанию "Reading List") и добавит заголовки столбцов при первом сохранении.
+Все сохранённые ссылки можно просмотреть двумя способами:
+
+1. **Через расширение**: Нажмите на иконку папки (📁) в header расширения, чтобы открыть список всех сохранённых ссылок. Вы можете:
+   - Искать ссылки по названию, описанию, URL, категории или тегам
+   - Редактировать существующие ссылки (категория, теги, заметки)
+   - Удалять ненужные ссылки
+   - Открывать ссылки в новой вкладке
+
+2. **Через Google Таблицу**: Все сохранённые ссылки можно просмотреть в вашей Google Таблице. Расширение автоматически создаст вкладку с указанным названием (по умолчанию "Reading List") и добавит заголовки столбцов при первом сохранении.
+
+### Управление ссылками через расширение
+
+Расширение предоставляет удобный интерфейс для управления сохранёнными ссылками:
+
+- **Просмотр списка**: Нажмите на иконку папки (📁) в header расширения
+- **Поиск**: Используйте поле поиска для фильтрации ссылок по названию, описанию, URL, категории или тегам
+- **Редактирование**: Нажмите на иконку настроек (⚙️) рядом с ссылкой для редактирования категории, тегов и заметок
+- **Удаление**: Нажмите на иконку корзины (🗑️) для удаления ссылки
+- **Открытие**: Нажмите на кнопку "Открыть" для открытия ссылки в новой вкладке
 
 ### Получение списка ссылок через API
 
@@ -304,6 +450,48 @@ fetch(scriptUrl, {
   "data": [],
   "count": 0
 }
+```
+
+### Обновление ссылки через API
+
+Для обновления существующей ссылки отправьте POST запрос с `action: "update"`:
+
+```javascript
+fetch(scriptUrl, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    action: 'update',
+    url: 'https://example.com', // URL ссылки для обновления
+    date: '2024-01-21T12:00:00.000Z', // Оригинальная дата (сохраняется)
+    title: 'Обновленный заголовок',
+    description: 'Обновленное описание',
+    category: 'Разработка',
+    tags: ['react', 'typescript'],
+    notes: 'Обновленные заметки',
+    image: 'data:image/jpeg;base64,...',
+    favicon: 'https://www.google.com/favicon.ico'
+  })
+})
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+### Удаление ссылки через API
+
+Для удаления ссылки отправьте POST запрос с `action: "delete"`:
+
+```javascript
+fetch(scriptUrl, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    action: 'delete',
+    url: 'https://example.com' // URL ссылки для удаления
+  })
+})
+  .then(response => response.json())
+  .then(data => console.log(data));
 ```
 
 ## 🛠️ Разработка
