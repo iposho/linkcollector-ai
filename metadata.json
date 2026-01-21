@@ -1,0 +1,8 @@
+{
+  "name": "LinkCollector AI",
+  "description": "Умное расширение для сохранения ссылок в Google Sheets с автоматическим извлечением метаданных и тегированием через Cerebras AI.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

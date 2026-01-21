@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "LinkCollector AI",
+  "version": "1.0",
+  "description": "Умное сохранение ссылок в Google Sheets с ИИ-тегированием",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://api.cerebras.ai/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Сохранить ссылку",
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://api.cerebras.ai https://script.google.com https://script.googleusercontent.com https://www.google.com https://picsum.photos; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+  }
+}
