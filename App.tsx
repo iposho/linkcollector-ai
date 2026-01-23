@@ -1,253 +1,88 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Plus, 
-  Tag, 
-  FolderOpen, 
-  ExternalLink, 
-  CheckCircle2, 
-  Loader2, 
-  Search,
-  Save,
-  Trash2,
+import {
+  Loader2,
   AlertCircle,
-  Settings as SettingsIcon,
-  ChevronLeft,
-  Info,
-  Globe,
   Database,
-  Copy,
-  Check
+  X,
+  Info,
+  Trash2
 } from 'lucide-react';
-import { PageMetadata, AppStatus, AppSettings, SavedLink } from './types';
-import { analyzePageContent } from './services/cerebrasService';
+import { PageMetadata, AppStatus, SavedLink } from './types';
+import { analyzePageContent } from './src/services/cerebrasService';
 
-declare const chrome: any;
+// Components
+import { Header, Button, Modal } from './src/components/common';
+import {
+  LinkForm,
+  SuccessScreen,
+  SettingsPage,
+  LinkListPage,
+  LinkEditorPage
+} from './src/components/pages';
 
-const DEFAULT_CATEGORIES = ["Разработка", "Дизайн", "Маркетинг", "ИИ", "Бизнес", "Прочее"];
+// Hooks
+import { useSettings } from './src/hooks/useSettings';
+import { useLinks } from './src/hooks/useLinks';
+import { useCapture } from './src/hooks/useCapture';
+
+// Utils
+import { isUrlSaved, removeSavedUrl as removeUrlFromStorage } from './src/utils/storage';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
   const [metadata, setMetadata] = useState<PageMetadata | null>(null);
   const [category, setCategory] = useState<string>("Прочее");
   const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState("");
-  const [newCategory, setNewCategory] = useState("");
   const [notes, setNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [savedLinks, setSavedLinks] = useState<SavedLink[]>([]);
   const [editingLink, setEditingLink] = useState<SavedLink | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
-  
-  const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('categories');
-    return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
-  });
-  
-  const [settings, setSettings] = useState<AppSettings>(() => ({
-    spreadsheetId: localStorage.getItem('gs_id') || '',
-    scriptUrl: localStorage.getItem('gs_script_url') || '',
-    autoAiAnalysis: localStorage.getItem('auto_ai') !== 'false',
-    folderName: localStorage.getItem('folder_name') || 'Reading List'
-  }));
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
 
-  const addCategory = (categoryName: string) => {
-    if (categoryName.trim() && !categories.includes(categoryName.trim())) {
-      const updated = [...categories, categoryName.trim()];
-      setCategories(updated);
-      localStorage.setItem('categories', JSON.stringify(updated));
-      setCategory(categoryName.trim());
-      setNewCategory("");
-      setShowNewCategoryInput(false); // Скрываем инпут после добавления
-    }
+  // Hooks
+  const { settings, setSettings, saveSettings, categories, addCategory, clearCache } = useSettings();
+  const { savedLinks, loading: linksLoading, error: linksError, loadLinks, saveLink, updateLink, deleteLink, setError: setLinksError } = useLinks({ scriptUrl: settings.scriptUrl });
+  const { captureTab, loading: captureLoading, error: captureError, setError: setCaptureError } = useCapture();
+
+  // Combined error
+  const error = linksError || captureError;
+  const setError = (err: string | null) => {
+    setLinksError(err);
+    setCaptureError(err);
   };
 
-  const getSavedUrls = (): string[] => {
-    const saved = localStorage.getItem('saved_links');
-    return saved ? JSON.parse(saved) : [];
-  };
-
-  const removeSavedUrl = (url: string) => {
-    const savedUrls = getSavedUrls();
-    const updatedUrls = savedUrls.filter(u => u !== url);
-    localStorage.setItem('saved_links', JSON.stringify(updatedUrls));
-    setStatus(AppStatus.IDLE);
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  const imageToBase64 = async (imageUrl: string): Promise<string> => {
-    try {
-      // Если уже base64, возвращаем как есть
-      if (imageUrl.startsWith('data:')) {
-        return imageUrl;
-      }
-      
-      // Пропускаем placeholder изображения
-      if (imageUrl.includes('picsum.photos')) {
-        return imageUrl; // Возвращаем URL для placeholder
-      }
-
-      // Пробуем загрузить через fetch (в расширении Chrome это должно работать благодаря host_permissions)
-      let response: Response;
-      try {
-        response = await fetch(imageUrl);
-      } catch (fetchError) {
-        // Если fetch не работает, пробуем через XHR
-        console.warn('Fetch failed, trying XHR:', fetchError);
-        try {
-          const blob = await new Promise<Blob>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', imageUrl, true);
-            xhr.responseType = 'blob';
-            xhr.onload = () => {
-              if (xhr.status === 200) {
-                resolve(xhr.response);
-              } else {
-                reject(new Error(`HTTP ${xhr.status}`));
-              }
-            };
-            xhr.onerror = () => reject(new Error('XHR network error'));
-            xhr.send();
-          });
-          
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error('FileReader error'));
-            reader.readAsDataURL(blob);
-          });
-        } catch (xhrError) {
-          console.warn('XHR also failed:', xhrError);
-          return imageUrl; // Возвращаем оригинальный URL
-        }
-      }
-
-      // Проверяем статус ответа
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      
-      // Проверяем, что blob не пустой
-      if (blob.size === 0) {
-        throw new Error('Empty blob');
-      }
-      
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = reader.result as string;
-          resolve(base64);
-        };
-        reader.onerror = () => reject(new Error('FileReader error'));
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Error converting image to base64:', error);
-      // В случае ошибки возвращаем оригинальный URL
-      return imageUrl;
-    }
-  };
-
-  const captureCurrentTab = useCallback(async () => {
+  // Capture current tab on mount
+  const handleCapture = useCallback(async () => {
     setStatus(AppStatus.EXTRACTING);
     setError(null);
 
-    try {
-      if (typeof chrome !== 'undefined' && chrome.tabs) {
-        // Пытаемся получить активную вкладку из текущего окна
-        let tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        // Если не нашли, ищем последнюю активную вкладку из всех окон
-        if (tabs.length === 0) {
-          tabs = await chrome.tabs.query({ active: true });
-        }
-        
-        // Если все еще нет, берем последнюю вкладку
-        if (tabs.length === 0) {
-          tabs = await chrome.tabs.query({});
-          tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-        }
-        
-        const tab = tabs[0];
-        
-        if (!tab || !tab.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('chrome-extension://')) {
-          throw new Error("Невозможно извлечь данные с этой страницы");
-        }
-
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => {
-            const getMeta = (name: string) => 
-              document.querySelector(`meta[property="${name}"]`)?.getAttribute('content') ||
-              document.querySelector(`meta[name="${name}"]`)?.getAttribute('content') || "";
-            
-            return {
-              url: window.location.href,
-              title: document.title,
-              description: getMeta('og:description') || getMeta('description'),
-              image: getMeta('og:image') || `https://picsum.photos/seed/${Math.random()}/800/400`,
-              favicon: `https://www.google.com/s2/favicons?domain=${window.location.hostname}&sz=128`
-            };
-          }
-        });
-
-        const extracted = results[0].result as PageMetadata;
-        setMetadata(extracted);
-
-        const isAlreadySaved = getSavedUrls().includes(extracted.url);
-        if (isAlreadySaved) {
-          setStatus(AppStatus.ALREADY_EXISTS);
-        }
-
-        if (settings.autoAiAnalysis) {
-          setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.ANALYZING);
-          const aiData = await analyzePageContent(extracted);
-          setCategory(aiData.category);
-          setTags(aiData.tags);
-          setNotes(aiData.summary);
-        }
-        
-        if (!isAlreadySaved || !settings.autoAiAnalysis) {
-          setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.IDLE);
-        } else {
-          setStatus(AppStatus.ALREADY_EXISTS);
-        }
-      } else {
-        // Mock для разработки
-        setTimeout(() => {
-          setMetadata({
-            url: "https://example.com",
-            title: "Пример страницы",
-            description: "Это демонстрационное описание страницы.",
-            image: "https://picsum.photos/seed/1/800/400",
-            favicon: "https://www.google.com/favicon.ico"
-          });
-          setStatus(AppStatus.IDLE);
-        }, 1000);
-      }
-    } catch (err: any) {
-      setError(err.message);
+    const extracted = await captureTab();
+    if (!extracted) {
       setStatus(AppStatus.ERROR);
+      return;
     }
-  }, [settings.autoAiAnalysis]);
+
+    setMetadata(extracted);
+    const isAlreadySaved = isUrlSaved(extracted.url);
+
+    if (isAlreadySaved) {
+      setStatus(AppStatus.ALREADY_EXISTS);
+    }
+
+    if (settings.autoAiAnalysis) {
+      setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.ANALYZING);
+      const aiData = await analyzePageContent(extracted);
+      setCategory(aiData.category);
+      setTags(aiData.tags);
+      setNotes(aiData.summary);
+    }
+
+    setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.IDLE);
+  }, [captureTab, settings.autoAiAnalysis]);
 
   useEffect(() => {
-    captureCurrentTab();
-  }, [captureCurrentTab]);
+    handleCapture();
+  }, []);
 
+  // Handlers
   const handleSave = async () => {
     if (!metadata || !settings.scriptUrl) {
       if (!settings.scriptUrl) {
@@ -256,162 +91,27 @@ const App: React.FC = () => {
       }
       return;
     }
-    
+
     setStatus(AppStatus.SAVING);
     try {
-      // Конвертируем изображение в base64
-      let imageBase64 = metadata.image;
-      if (metadata.image && !metadata.image.startsWith('data:') && !metadata.image.includes('picsum.photos')) {
-        try {
-          imageBase64 = await imageToBase64(metadata.image);
-        } catch (err) {
-          console.warn('Не удалось конвертировать изображение в base64:', err);
-          // В случае ошибки используем оригинальный URL
-          imageBase64 = metadata.image;
-        }
-      }
-
-      const savedUrls = getSavedUrls();
-      const wasAlreadySaved = savedUrls.includes(metadata.url);
-      
-      // Определяем действие: если ссылка уже существует, обновляем, иначе создаем
-      const action = wasAlreadySaved ? 'update' : 'create';
-      
-      const response = await fetch(settings.scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors', // Важно для Apps Script Web App
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: action,
-          url: metadata.url,
-          ...metadata,
-          image: imageBase64, // Отправляем base64 версию
-          category,
-          tags,
-          notes,
-          timestamp: new Date().toISOString()
-        })
+      await saveLink({
+        url: metadata.url,
+        title: metadata.title,
+        description: metadata.description,
+        image: metadata.image,
+        favicon: metadata.favicon,
+        category,
+        tags,
+        notes
       });
-      
-      // Обновляем локальный список ссылок
-      if (!wasAlreadySaved) {
-        const updatedUrls = [...savedUrls, metadata.url];
-        localStorage.setItem('saved_links', JSON.stringify(updatedUrls));
-      }
-      
       setStatus(AppStatus.SUCCESS);
-    } catch (err) {
-      setError("Ошибка при отправке в Google Sheets");
+    } catch (err: any) {
+      setError(err.message || "Ошибка при отправке в Google Sheets");
       setStatus(AppStatus.IDLE);
     }
   };
 
-  const saveSettings = () => {
-    localStorage.setItem('gs_id', settings.spreadsheetId);
-    localStorage.setItem('gs_script_url', settings.scriptUrl);
-    localStorage.setItem('auto_ai', String(settings.autoAiAnalysis));
-    localStorage.setItem('folder_name', settings.folderName);
-    setStatus(AppStatus.IDLE);
-  };
-
-  const clearCache = () => {
-    if (confirm('Вы уверены, что хотите очистить весь кэш расширения? Это удалит все сохраненные ссылки, категории и настройки.')) {
-      // Очищаем все данные из localStorage
-      localStorage.removeItem('saved_links');
-      localStorage.removeItem('categories');
-      localStorage.removeItem('gs_id');
-      localStorage.removeItem('gs_script_url');
-      localStorage.removeItem('auto_ai');
-      localStorage.removeItem('folder_name');
-      
-      // Сбрасываем состояние
-      setCategories(DEFAULT_CATEGORIES);
-      setSettings({
-        spreadsheetId: '',
-        scriptUrl: '',
-        autoAiAnalysis: true,
-        folderName: 'Reading List'
-      });
-      
-      alert('Кэш успешно очищен!');
-    }
-  };
-
-  const loadSavedLinks = async () => {
-    if (!settings.scriptUrl) {
-      setError("Укажите Script URL в настройках");
-      return;
-    }
-    
-    try {
-      setStatus(AppStatus.EXTRACTING);
-      const response = await fetch(settings.scriptUrl, {
-        method: 'GET'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch links');
-      }
-      
-      const result = await response.json();
-      if (result.success) {
-        setSavedLinks(result.data || []);
-        setStatus(AppStatus.LIST);
-      } else {
-        throw new Error(result.error || 'Failed to load links');
-      }
-    } catch (err: any) {
-      setError(err.message || "Ошибка при загрузке списка ссылок");
-      setStatus(AppStatus.ERROR);
-    }
-  };
-
-  const deleteLink = async (url: string) => {
-    if (!settings.scriptUrl) {
-      setError("Укажите Script URL в настройках");
-      return;
-    }
-    
-    if (!confirm('Вы уверены, что хотите удалить эту ссылку?')) {
-      return;
-    }
-    
-    try {
-      // Сначала обновляем локальный список для мгновенной обратной связи
-      const savedUrls = getSavedUrls();
-      const updatedUrls = savedUrls.filter(u => u !== url);
-      localStorage.setItem('saved_links', JSON.stringify(updatedUrls));
-      
-      // Обновляем список ссылок в UI
-      setSavedLinks(savedLinks.filter(link => link.url !== url));
-      
-      // Отправляем запрос на удаление в Google Sheets
-      const response = await fetch(settings.scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'delete',
-          url: url
-        })
-      });
-      
-      // При mode: 'no-cors' мы не можем прочитать ответ, но запрос отправлен
-      // Перезагружаем список через небольшую задержку для синхронизации
-      setTimeout(() => {
-        loadSavedLinks();
-      }, 500);
-      
-    } catch (err) {
-      setError("Ошибка при удалении ссылки");
-      // В случае ошибки перезагружаем список, чтобы синхронизировать состояние
-      setTimeout(() => {
-        loadSavedLinks();
-      }, 500);
-    }
-  };
-
-  const startEditing = (link: SavedLink) => {
+  const handleEdit = (link: SavedLink) => {
     setEditingLink(link);
     setMetadata({
       url: link.url,
@@ -427,460 +127,124 @@ const App: React.FC = () => {
   };
 
   const handleUpdate = async () => {
-    if (!metadata || !settings.scriptUrl || !editingLink) {
-      return;
-    }
-    
+    if (!metadata || !editingLink) return;
+
     setStatus(AppStatus.SAVING);
     try {
-      // Конвертируем изображение в base64, если нужно
-      let imageBase64 = metadata.image;
-      if (metadata.image && !metadata.image.startsWith('data:') && !metadata.image.includes('picsum.photos')) {
-        try {
-          imageBase64 = await imageToBase64(metadata.image);
-        } catch (err) {
-          console.warn('Не удалось конвертировать изображение в base64:', err);
-          imageBase64 = metadata.image;
-        }
-      }
-      
-      const response = await fetch(settings.scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update',
-          url: editingLink.url,
-          date: editingLink.date, // Сохраняем оригинальную дату
-          title: metadata.title,
-          description: metadata.description,
-          category: category,
-          tags: tags,
-          notes: notes,
-          image: imageBase64,
-          favicon: metadata.favicon
-        })
+      await updateLink(editingLink.url, {
+        url: metadata.url,
+        title: metadata.title,
+        description: metadata.description,
+        image: metadata.image,
+        favicon: metadata.favicon,
+        category,
+        tags,
+        notes,
+        date: editingLink.date
       });
-      
-      // Перезагружаем список для синхронизации
-      setTimeout(() => {
-        loadSavedLinks();
-      }, 500);
-      
-      setStatus(AppStatus.SUCCESS);
+      setStatus(AppStatus.LIST);
       setEditingLink(null);
-    } catch (err) {
-      setError("Ошибка при обновлении ссылки");
-      setStatus(AppStatus.IDLE);
+      setTimeout(() => loadLinks(), 500);
+    } catch (err: any) {
+      setError(err.message || "Ошибка при обновлении ссылки");
+      setStatus(AppStatus.EDITING);
     }
   };
 
-  const filteredLinks = savedLinks.filter(link => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      link.title.toLowerCase().includes(query) ||
-      link.description.toLowerCase().includes(query) ||
-      link.url.toLowerCase().includes(query) ||
-      link.category.toLowerCase().includes(query) ||
-      link.tags.some(tag => tag.toLowerCase().includes(query))
-    );
-  });
+  const handleSaveSettings = () => {
+    saveSettings(settings);
+    setStatus(AppStatus.IDLE);
+  };
 
+  const handleClearCache = () => {
+    clearCache();
+  };
+
+  const handleOpenList = async () => {
+    await loadLinks();
+    setStatus(AppStatus.LIST);
+  };
+
+  const handleRemoveFromSaved = () => {
+    if (metadata) {
+      removeUrlFromStorage(metadata.url);
+      setStatus(AppStatus.IDLE);
+      setShowRemoveModal(false);
+    }
+  };
+
+  const handleAddCategory = (name: string) => {
+    const added = addCategory(name);
+    if (added) {
+      setCategory(added);
+    }
+  };
+
+  // Render based on status
   if (status === AppStatus.SETTINGS) {
     return (
-      <div className="w-[450px] bg-white flex flex-col min-h-[100%]">
-        <header className="px-5 py-4 bg-slate-900 text-white flex items-center gap-3">
-          <button onClick={() => setStatus(AppStatus.IDLE)} className="p-2 hover:bg-white/10 rounded-lg">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-bold">Настройки</h1>
-        </header>
-        <div className="p-6 space-y-5 flex-1 bg-slate-50/30 overflow-y-auto">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Google Apps Script URL</label>
-            <input 
-              type="text"
-              value={settings.scriptUrl}
-              onChange={(e) => setSettings({...settings, scriptUrl: e.target.value})}
-              placeholder="https://script.google.com/macros/s/.../exec"
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="text-[10px] text-slate-400 italic">Сюда будут отправляться POST-запросы с данными</p>
-          </div>
-
-          <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <span className="text-sm font-bold text-indigo-800">API: Получение списка ссылок</span>
-                <p className="text-[11px] text-indigo-600 mt-1">Используйте GET запрос для получения всех сохраненных ссылок</p>
-              </div>
-            </div>
-            <div className="bg-slate-900 rounded-lg p-3 relative">
-              <code className="text-[10px] text-green-400 font-mono block whitespace-pre-wrap break-all">
-{`fetch('${settings.scriptUrl || 'https://script.google.com/macros/s/.../exec'}')
-  .then(res => res.json())
-  .then(data => console.log(data.data));`}
-              </code>
-              <button
-                onClick={() => copyToClipboard(`fetch('${settings.scriptUrl || 'https://script.google.com/macros/s/.../exec'}')
-  .then(res => res.json())
-  .then(data => console.log(data.data));`)}
-                className="absolute top-2 right-2 p-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
-                title="Копировать код"
-              >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-            <p className="text-[10px] text-indigo-500 mt-2">Ответ: {"{"} success: true, count: number, data: [...] {"}"}</p>
-          </div>
-
-          <div className="space-y-2 hidden">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Название вкладки</label>
-            <input 
-              type="text"
-              value={settings.folderName}
-              onChange={(e) => setSettings({...settings, folderName: e.target.value})}
-              placeholder="Reading List"
-              disabled
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm shadow-sm outline-none text-slate-400 cursor-not-allowed"
-            />
-          </div>
-          <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <div>
-              <span className="text-sm font-bold text-slate-700">ИИ-анализ (Cerebras)</span>
-              <p className="text-[11px] text-slate-500">Автоматически подбирать теги</p>
-            </div>
-            <button 
-              onClick={() => setSettings({...settings, autoAiAnalysis: !settings.autoAiAnalysis})}
-              className={`w-12 h-6 rounded-full relative transition-colors ${settings.autoAiAnalysis ? 'bg-indigo-600' : 'bg-slate-300'}`}
-            >
-              <div className={`absolute top-1 bg-white w-4 h-4 rounded-full transition-transform ${settings.autoAiAnalysis ? 'left-7' : 'left-1'}`} />
-            </button>
-          </div>
-          
-          <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <span className="text-sm font-bold text-red-800">Очистка кэша</span>
-                <p className="text-[11px] text-red-600">Удалить все сохраненные данные</p>
-              </div>
-            </div>
-            <button 
-              onClick={clearCache}
-              className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              Очистить кэш
-            </button>
-          </div>
-        </div>
-        <footer className="p-5 border-t">
-          <button onClick={saveSettings} className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl shadow-lg">
-            Сохранить
-          </button>
-        </footer>
-      </div>
+      <SettingsPage
+        settings={settings}
+        onSettingsChange={setSettings}
+        onSave={handleSaveSettings}
+        onClearCache={handleClearCache}
+        onBack={() => setStatus(AppStatus.IDLE)}
+      />
     );
   }
 
   if (status === AppStatus.SUCCESS) {
     return (
-      <div className="w-[450px] p-10 flex flex-col items-center justify-center bg-white min-h-[600px]">
-        <div className="bg-green-50 p-6 rounded-full mb-6 border border-green-100">
-          <CheckCircle2 className="text-green-500 w-16 h-16" />
-        </div>
-        <h2 className="text-2xl font-black text-slate-800">Готово!</h2>
-        <p className="text-slate-500 text-center mt-3">Ссылка улетела в Google Sheets.</p>
-        <button 
-          onClick={() => { setStatus(AppStatus.IDLE); captureCurrentTab(); }}
-          className="mt-10 w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl active:scale-95 transition-all"
-        >
-          Закрыть
-        </button>
-      </div>
+      <SuccessScreen
+        onClose={() => {
+          setStatus(AppStatus.IDLE);
+          handleCapture();
+        }}
+      />
     );
   }
 
   if (status === AppStatus.LIST) {
     return (
-      <div className="w-[450px] min-h-[600px] max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
-        <header className="px-5 py-4 bg-indigo-600 text-white flex items-center gap-3 shadow-lg">
-          <button onClick={() => setStatus(AppStatus.IDLE)} className="p-2 hover:bg-white/10 rounded-lg">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-black text-lg flex-1">Мои ссылки</h1>
-          <button onClick={loadSavedLinks} className="p-2 hover:bg-white/10 rounded-lg" title="Обновить">
-            <Loader2 className="w-5 h-5" />
-          </button>
-        </header>
-        
-        <div className="p-4 bg-slate-50 border-b">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по ссылкам..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
-
-        <main className="flex-1 overflow-y-auto p-4 space-y-3">
-          {filteredLinks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-              <FolderOpen className="w-12 h-12 mb-4 opacity-20" />
-              <p className="text-sm font-bold text-center">
-                {searchQuery ? 'Ничего не найдено' : 'Нет сохраненных ссылок'}
-              </p>
-            </div>
-          ) : (
-            filteredLinks.map((link) => (
-              <div key={link.url} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-3">
-                  {link.image && (
-                    <img src={link.image} alt={link.title} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="font-bold text-sm text-slate-800 line-clamp-2 flex-1">{link.title}</h3>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => startEditing(link)}
-                          className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Редактировать"
-                        >
-                          <SettingsIcon className="w-4 h-4 text-indigo-600" />
-                        </button>
-                        <button
-                          onClick={() => deleteLink(link.url)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Удалить"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-mono truncate mb-2">{link.url}</p>
-                    {link.description && (
-                      <p className="text-xs text-slate-600 line-clamp-2 mb-2">{link.description}</p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">
-                        {link.category}
-                      </span>
-                      {link.tags.slice(0, 3).map((tag, idx) => (
-                        <span key={idx} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px]">
-                          #{tag}
-                        </span>
-                      ))}
-                      {link.tags.length > 3 && (
-                        <span className="text-[10px] text-slate-400">+{link.tags.length - 3}</span>
-                      )}
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        onClick={() => window.open(link.url, '_blank')}
-                        className="text-[10px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        Открыть
-                      </button>
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(link.date).toLocaleDateString('ru-RU')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </main>
-
-        <footer className="p-4 border-t bg-white">
-          <button
-            onClick={() => setStatus(AppStatus.IDLE)}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors"
-          >
-            Вернуться к сохранению
-          </button>
-        </footer>
-      </div>
+      <LinkListPage
+        links={savedLinks}
+        loading={linksLoading}
+        onEdit={handleEdit}
+        onDelete={deleteLink}
+        onRefresh={loadLinks}
+        onBack={() => setStatus(AppStatus.IDLE)}
+      />
     );
   }
 
-  if (status === AppStatus.EDITING) {
+  if (status === AppStatus.EDITING && metadata && editingLink) {
     return (
-      <div className="w-[450px] min-h-[600px] max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
-        <header className="px-5 py-4 bg-indigo-600 text-white flex items-center gap-3 shadow-lg">
-          <button onClick={() => { setStatus(AppStatus.LIST); setEditingLink(null); }} className="p-2 hover:bg-white/10 rounded-lg">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-black text-lg">Редактирование</h1>
-        </header>
-
-        <main className="flex-1 p-5 space-y-5 overflow-y-auto bg-slate-50/50">
-          {metadata && (
-            <>
-              <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-sm">
-                <img src={metadata.image} className="w-full h-32 object-cover bg-slate-100" alt="Preview" />
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <img src={metadata.favicon} className="w-4 h-4" alt="ico" />
-                    <span className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]">{metadata.url}</span>
-                  </div>
-                  <h3 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight">{metadata.title}</h3>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
-                    <FolderOpen className="w-3 h-3" /> Категория
-                  </label>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <select 
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value)}
-                          className="w-full px-4 py-3 pr-10 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm appearance-none"
-                        >
-                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setShowNewCategoryInput(!showNewCategoryInput)}
-                        className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm"
-                        title="Добавить категорию"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {showNewCategoryInput && (
-                      <div className="relative animate-in fade-in slide-in-from-top-2">
-                        <input 
-                          type="text"
-                          value={newCategory}
-                          onChange={(e) => setNewCategory(e.target.value)}
-                          onKeyDown={(e) => {
-                            if(e.key === 'Enter' && newCategory.trim()) {
-                              addCategory(newCategory);
-                            } else if(e.key === 'Escape') {
-                              setShowNewCategoryInput(false);
-                              setNewCategory("");
-                            }
-                          }}
-                          placeholder="Название новой категории (Enter для добавления, Esc для отмены)..."
-                          className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => {
-                            if (newCategory.trim()) {
-                              addCategory(newCategory);
-                            } else {
-                              setShowNewCategoryInput(false);
-                            }
-                          }}
-                          className="absolute right-2 top-1.5 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                          title="Добавить"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
-                    <Tag className="w-3 h-3" /> Теги
-                  </label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {tags.map(t => (
-                      <span key={t} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100 flex items-center gap-1.5">
-                        #{t.toUpperCase()}
-                        <button onClick={() => setTags(tags.filter(tag => tag !== t))} className="hover:text-red-500">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="relative">
-                    <input 
-                      type="text"
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      onKeyDown={(e) => {
-                        if(e.key === 'Enter' && newTag.trim()) {
-                          setTags([...new Set([...tags, newTag.trim()])]);
-                          setNewTag("");
-                        }
-                      }}
-                      placeholder="Добавить тег (Enter)..."
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <Plus className="absolute right-4 top-3.5 w-4 h-4 text-slate-300" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
-                    <Search className="w-3 h-3" /> Описание / Резюме
-                  </label>
-                  <textarea 
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm min-h-[100px] shadow-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
-                    placeholder="Добавьте свои заметки..."
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </main>
-
-        <footer className="p-5 border-t bg-white flex gap-3">
-          <button 
-            onClick={handleUpdate}
-            disabled={!metadata || status === AppStatus.SAVING}
-            className="flex-1 flex items-center justify-center gap-2.5 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm rounded-2xl shadow-xl transition-all active:scale-95"
-          >
-            {status === AppStatus.SAVING ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> СОХРАНИТЬ ИЗМЕНЕНИЯ</>}
-          </button>
-        </footer>
-      </div>
+      <LinkEditorPage
+        metadata={metadata}
+        editingLink={editingLink}
+        category={category}
+        categories={categories}
+        tags={tags}
+        notes={notes}
+        saving={false}
+        onCategoryChange={setCategory}
+        onAddCategory={handleAddCategory}
+        onTagsChange={setTags}
+        onNotesChange={setNotes}
+        onSave={handleUpdate}
+        onBack={() => { setStatus(AppStatus.LIST); setEditingLink(null); }}
+      />
     );
   }
 
+  // Main view
   return (
     <div className="w-[450px] min-h-[100%] bg-white flex flex-col overflow-hidden border border-slate-100">
-      <header className="px-5 py-4 bg-indigo-600 text-white flex justify-between items-center shadow-lg relative z-10">
-        <div className="flex items-center gap-2.5">
-          <Globe className="w-5 h-5 opacity-80" />
-          <h1 className="font-black text-lg">LinkCollector AI</h1>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={loadSavedLinks} className="p-2 hover:bg-white/20 rounded-xl transition-all" title="Мои ссылки">
-            <FolderOpen className="w-5 h-5" />
-          </button>
-          <button onClick={() => setStatus(AppStatus.SETTINGS)} className="p-2 hover:bg-white/20 rounded-xl transition-all">
-            <SettingsIcon className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
+      <Header
+        title="LinkCollector AI"
+        onOpenList={handleOpenList}
+        onSettings={() => setStatus(AppStatus.SETTINGS)}
+      />
 
       <main className="flex-1 p-5 space-y-5 overflow-y-auto bg-slate-50/50">
         {status === AppStatus.EXTRACTING || status === AppStatus.ANALYZING ? (
@@ -897,174 +261,85 @@ const App: React.FC = () => {
                 <Info className="w-5 h-5 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-xs font-bold">Вы уже сохраняли эту ссылку ранее!</p>
-                  <p className="text-[10px] text-indigo-600 mt-1 mb-3">Вы можете отредактировать категорию, теги и заметки, затем сохранить обновленную версию, или удалить ссылку из сохраненных.</p>
-                  <button
-                    onClick={() => {
-                      if (metadata && confirm('Вы уверены, что хотите удалить эту ссылку из сохраненных?')) {
-                        removeSavedUrl(metadata.url);
-                      }
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded-lg transition-colors"
+                  <p className="text-[10px] text-indigo-600 mt-1 mb-3">
+                    Вы можете отредактировать и сохранить обновленную версию, или удалить из сохраненных.
+                  </p>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setShowRemoveModal(true)}
+                    icon={<Trash2 className="w-3.5 h-3.5" />}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
                     Удалить из сохраненных
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
 
-            <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-sm">
-              <img src={metadata.image} className="w-full h-32 object-cover bg-slate-100" alt="Preview" />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <img src={metadata.favicon} className="w-4 h-4" alt="ico" />
-                  <span className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]">{metadata.url}</span>
-                </div>
-                <h3 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight">{metadata.title}</h3>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
-                  <FolderOpen className="w-3 h-3" /> Категория
-                </label>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <select 
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className="w-full px-4 py-3 pr-10 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm appearance-none"
-                      >
-                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowNewCategoryInput(!showNewCategoryInput)}
-                      className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm"
-                      title="Добавить категорию"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {showNewCategoryInput && (
-                    <div className="relative animate-in fade-in slide-in-from-top-2">
-                      <input 
-                        type="text"
-                        value={newCategory}
-                        onChange={(e) => setNewCategory(e.target.value)}
-                        onKeyDown={(e) => {
-                          if(e.key === 'Enter' && newCategory.trim()) {
-                            addCategory(newCategory);
-                          } else if(e.key === 'Escape') {
-                            setShowNewCategoryInput(false);
-                            setNewCategory("");
-                          }
-                        }}
-                        placeholder="Название новой категории (Enter для добавления, Esc для отмены)..."
-                        className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => {
-                          if (newCategory.trim()) {
-                            addCategory(newCategory);
-                          } else {
-                            setShowNewCategoryInput(false);
-                          }
-                        }}
-                        className="absolute right-2 top-1.5 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                        title="Добавить"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
-                  <Tag className="w-3 h-3" /> Теги
-                </label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {tags.map(t => (
-                    <span key={t} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100 flex items-center gap-1.5 animate-in zoom-in-90">
-                      #{t.toUpperCase()}
-                      <button onClick={() => setTags(tags.filter(tag => tag !== t))} className="hover:text-red-500">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="relative">
-                  <input 
-                    type="text"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if(e.key === 'Enter' && newTag.trim()) {
-                        setTags([...new Set([...tags, newTag.trim()])]);
-                        setNewTag("");
-                      }
-                    }}
-                    placeholder="Добавить тег (Enter)..."
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <Plus className="absolute right-4 top-3.5 w-4 h-4 text-slate-300" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 px-1">
-                  <Search className="w-3 h-3" /> Описание / Резюме
-                </label>
-                <textarea 
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm min-h-[100px] shadow-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
-                  placeholder="Добавьте свои заметки..."
-                />
-              </div>
-            </div>
+            <LinkForm
+              metadata={metadata}
+              category={category}
+              categories={categories}
+              tags={tags}
+              notes={notes}
+              onCategoryChange={setCategory}
+              onAddCategory={handleAddCategory}
+              onTagsChange={setTags}
+              onNotesChange={setNotes}
+            />
           </>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <AlertCircle className="w-12 h-12 mb-4 opacity-20" />
-            <p className="text-sm font-bold text-center px-10">{error || "Не удалось захватить данные страницы"}</p>
-            <button onClick={captureCurrentTab} className="mt-5 px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Обновить</button>
+            <p className="text-sm font-bold text-center px-10">
+              {error || "Не удалось захватить данные страницы"}
+            </p>
+            <Button onClick={handleCapture} className="mt-5" size="sm">
+              Обновить
+            </Button>
           </div>
         )}
       </main>
 
       <footer className="p-5 border-t bg-white flex gap-3">
-        <button 
+        <Button
           onClick={handleSave}
           disabled={!metadata || status === AppStatus.SAVING || !settings.scriptUrl}
-          className="flex-1 flex items-center justify-center gap-2.5 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm rounded-2xl shadow-xl transition-all active:scale-95"
+          loading={status === AppStatus.SAVING}
+          icon={<Database className="w-5 h-5" />}
+          className="flex-[1.3]"
+          size="lg"
         >
-          {status === AppStatus.SAVING ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Database className="w-5 h-5" /> СОХРАНИТЬ</>}
-        </button>
-        <button 
-          onClick={() => metadata && window.open(metadata.url, '_blank')}
-          className="px-4 bg-slate-50 border border-slate-200 text-slate-500 rounded-2xl hover:bg-slate-100"
+          СОХРАНИТЬ
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => window.close()}
+          disabled={status === AppStatus.SAVING}
+          icon={<X className="w-5 h-5" />}
+          className="flex-1"
+          size="lg"
         >
-          <ExternalLink className="w-5 h-5" />
-        </button>
+          ОТМЕНИТЬ
+        </Button>
       </footer>
 
       {error && status !== AppStatus.ERROR && (
         <div className="px-5 py-2 bg-red-600 text-white text-[10px] font-black flex items-center justify-between">
           <span className="truncate">{error}</span>
-          <button onClick={() => setError(null)}>×</button>
+          <button onClick={() => setError(null)} aria-label="Закрыть">×</button>
         </div>
       )}
+
+      <Modal
+        isOpen={showRemoveModal}
+        onClose={() => setShowRemoveModal(false)}
+        onConfirm={handleRemoveFromSaved}
+        title="Удалить из сохраненных?"
+        description="Ссылка будет удалена из локального списка сохраненных."
+        confirmText="Удалить"
+        variant="danger"
+      />
     </div>
   );
 };
