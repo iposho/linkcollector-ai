@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { AppSettings } from '../../types';
+import { AppSettings, SavedLink } from '../../types';
 import * as storage from '../utils/storage';
 import { DEFAULT_CATEGORIES } from '../constants';
 
@@ -29,8 +29,27 @@ export const useSettings = () => {
             spreadsheetId: '',
             scriptUrl: '',
             autoAiAnalysis: true,
-            folderName: 'Reading List'
+            folderName: 'Reading List',
+            cerebrasApiKey: ''
         });
+    }, []);
+
+    const syncCategories = useCallback((links: SavedLink[]) => {
+        if (!links || links.length === 0) return;
+
+        const uniqueCategories = Array.from(new Set(links.map(link => link.category).filter(Boolean)));
+
+        if (uniqueCategories.length > 0) {
+            setCategories(prev => {
+                const combined = Array.from(new Set([...prev, ...uniqueCategories]));
+                const changed = combined.length !== prev.length || combined.some((c, i) => c !== prev[i]);
+                if (changed) {
+                    storage.saveCategories(combined);
+                    return combined;
+                }
+                return prev;
+            });
+        }
     }, []);
 
     return {
@@ -39,7 +58,8 @@ export const useSettings = () => {
         saveSettings,
         categories,
         addCategory,
-        clearCache
+        clearCache,
+        syncCategories
     };
 };
 

@@ -8,7 +8,7 @@ interface SuccessScreenProps {
 
 export const SuccessScreen: React.FC<SuccessScreenProps> = ({ onClose }) => {
     return (
-        <div className="w-[450px] p-10 flex flex-col items-center justify-center bg-white min-h-[600px]">
+        <div className="w-[450px] p-10 flex flex-col items-center justify-center bg-white min-h-[600px] max-h-[600px]">
             <div className="bg-green-50 p-6 rounded-full mb-6 border border-green-100 animate-in zoom-in-50">
                 <CheckCircle2 className="text-green-500 w-16 h-16" />
             </div>

@@ -38,7 +38,7 @@ const App: React.FC = () => {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
 
   // Hooks
-  const { settings, setSettings, saveSettings, categories, addCategory, clearCache } = useSettings();
+  const { settings, setSettings, saveSettings, categories, addCategory, clearCache, syncCategories } = useSettings();
   const { savedLinks, loading: linksLoading, error: linksError, loadLinks, saveLink, updateLink, deleteLink, setError: setLinksError } = useLinks({ scriptUrl: settings.scriptUrl });
   const { captureTab, loading: captureLoading, error: captureError, setError: setCaptureError } = useCapture();
 
@@ -57,6 +57,7 @@ const App: React.FC = () => {
     const extracted = await captureTab();
     if (!extracted) {
       setStatus(AppStatus.ERROR);
+      setError('Не удалось получить данные вкладки');
       return;
     }
 
@@ -69,17 +70,21 @@ const App: React.FC = () => {
 
     if (settings.autoAiAnalysis) {
       setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.ANALYZING);
-      const aiData = await analyzePageContent(extracted);
+      const aiData = await analyzePageContent(extracted, settings.cerebrasApiKey, categories);
       setCategory(aiData.category);
       setTags(aiData.tags);
       setNotes(aiData.summary);
     }
 
     setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.IDLE);
-  }, [captureTab, settings.autoAiAnalysis]);
+  }, [captureTab, settings.autoAiAnalysis, settings.cerebrasApiKey, categories]);
 
   useEffect(() => {
     handleCapture();
+    // Load links on mount to sync categories early
+    loadLinks().then(links => {
+      if (links) syncCategories(links);
+    });
   }, []);
 
   // Handlers
@@ -161,8 +166,8 @@ const App: React.FC = () => {
   };
 
   const handleOpenList = async () => {
-    await loadLinks();
-    setStatus(AppStatus.LIST);
+    setStatus(AppStatus.LIST); // Show list screen immediately with skeleton
+    loadLinks(); // Load links in background (skeleton will show while loading)
   };
 
   const handleRemoveFromSaved = () => {
@@ -239,9 +244,9 @@ const App: React.FC = () => {
 
   // Main view
   return (
-    <div className="w-[450px] min-h-[100%] bg-white flex flex-col overflow-hidden border border-slate-100">
+    <div className="w-[450px] min-h-[600px] max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
       <Header
-        title="LinkCollector AI"
+        title="LinkCollector"
         onOpenList={handleOpenList}
         onSettings={() => setStatus(AppStatus.SETTINGS)}
       />

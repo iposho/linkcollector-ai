@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Trash2, Copy, Check, Info, Database } from 'lucide-react';
+import { Trash2, Copy, Check, Info, Database, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import { AppSettings } from '../../../types';
 import { Header, Button, Modal } from '../common';
+import { validateCerebrasApiKey } from '../../services/cerebrasService';
 
 interface SettingsPageProps {
     settings: AppSettings;
@@ -20,6 +21,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
     const [copied, setCopied] = useState(false);
     const [showClearModal, setShowClearModal] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
+    const [validationResult, setValidationResult] = useState<{ success: boolean; message: string } | null>(null);
 
     const copyToClipboard = async (text: string) => {
         try {
@@ -40,12 +43,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         setShowClearModal(false);
     };
 
+    const handleTestConnection = async () => {
+        if (!settings.cerebrasApiKey) {
+            setValidationResult({ success: false, message: 'Сначала введите API ключ' });
+            return;
+        }
+
+        setIsValidating(true);
+        setValidationResult(null);
+
+        try {
+            const result = await validateCerebrasApiKey(settings.cerebrasApiKey);
+            if (result.success) {
+                setValidationResult({ success: true, message: 'Соединение установлено!' });
+            } else {
+                setValidationResult({ success: false, message: result.error || 'Ошибка проверки' });
+            }
+        } catch (err) {
+            setValidationResult({ success: false, message: 'Ошибка сети' });
+        } finally {
+            setIsValidating(false);
+        }
+    };
+
     const apiCodeExample = `fetch('${settings.scriptUrl || 'https://script.google.com/macros/s/.../exec'}')
   .then(res => res.json())
   .then(data => console.log(data.data));`;
 
     return (
-        <div className="w-[450px] bg-white flex flex-col min-h-[100%]">
+        <div className="w-[450px] min-h-[600px] max-h-[600px] bg-white flex flex-col overflow-hidden">
             <Header
                 title="Настройки"
                 onBack={onBack}
@@ -114,6 +140,56 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         <div className={`absolute top-1 bg-white w-4 h-4 rounded-full transition-transform ${settings.autoAiAnalysis ? 'left-7' : 'left-1'}`} />
                     </button>
                 </div>
+
+                {/* Cerebras API Key */}
+                {settings.autoAiAnalysis && (
+                    <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Cerebras API Key
+                            </label>
+                            <input
+                                type="password"
+                                value={settings.cerebrasApiKey || ''}
+                                onChange={(e) => {
+                                    onSettingsChange({ ...settings, cerebrasApiKey: e.target.value });
+                                    setValidationResult(null);
+                                }}
+                                placeholder="csk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleTestConnection}
+                                loading={isValidating}
+                                className="text-[11px] h-9"
+                                icon={!isValidating && <ShieldCheck className="w-3.5 h-3.5" />}
+                            >
+                                Проверить соединение
+                            </Button>
+
+                            {validationResult && (
+                                <div className={`flex items-center gap-1.5 text-[11px] font-medium animate-in fade-in slide-in-from-left-2 ${validationResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                    {validationResult.success ? (
+                                        <ShieldCheck className="w-3.5 h-3.5" />
+                                    ) : (
+                                        <ShieldAlert className="w-3.5 h-3.5" />
+                                    )}
+                                    <span className="truncate max-w-[150px]">{validationResult.message}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <p className="text-[10px] text-slate-400 italic">
+                            Получить ключ: <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">cloud.cerebras.ai</a> (бесплатно)
+                        </p>
+                    </div>
+                )}
+
 
                 {/* Clear Cache */}
                 <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">

@@ -24,6 +24,7 @@ export interface AppSettings {
   scriptUrl: string; // URL для Google Apps Script Web App
   autoAiAnalysis: boolean;
   folderName: string;
+  cerebrasApiKey: string; // API ключ для Cerebras AI
 }
 
 export enum AppStatus {

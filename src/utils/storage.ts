@@ -37,7 +37,8 @@ export const getSettings = () => ({
     spreadsheetId: localStorage.getItem('gs_id') || '',
     scriptUrl: localStorage.getItem('gs_script_url') || '',
     autoAiAnalysis: localStorage.getItem('auto_ai') !== 'false',
-    folderName: localStorage.getItem('folder_name') || 'Reading List'
+    folderName: localStorage.getItem('folder_name') || 'Reading List',
+    cerebrasApiKey: localStorage.getItem('cerebras_api_key') || ''
 });
 
 export const saveSettings = (settings: {
@@ -45,11 +46,13 @@ export const saveSettings = (settings: {
     scriptUrl: string;
     autoAiAnalysis: boolean;
     folderName: string;
+    cerebrasApiKey: string;
 }): void => {
     localStorage.setItem('gs_id', settings.spreadsheetId);
     localStorage.setItem('gs_script_url', settings.scriptUrl);
     localStorage.setItem('auto_ai', String(settings.autoAiAnalysis));
     localStorage.setItem('folder_name', settings.folderName);
+    localStorage.setItem('cerebras_api_key', settings.cerebrasApiKey);
 };
 
 export const clearAllCache = (): void => {
@@ -59,4 +62,5 @@ export const clearAllCache = (): void => {
     localStorage.removeItem('gs_script_url');
     localStorage.removeItem('auto_ai');
     localStorage.removeItem('folder_name');
+    localStorage.removeItem('cerebras_api_key');
 };

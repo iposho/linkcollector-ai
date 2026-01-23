@@ -177,9 +177,9 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
             </div>
 
             {/* Links List */}
-            <main className="flex-1 overflow-hidden">
+            <main className="flex-1 overflow-y-auto">
                 {loading ? (
-                    <div className="p-4 space-y-3 overflow-y-auto h-full">
+                    <div className="p-4 space-y-3">
                         <LinkListSkeleton count={4} />
                     </div>
                 ) : filteredAndSortedLinks.length === 0 ? (
@@ -207,7 +207,7 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
                     />
                 ) : (
                     // Regular list for small datasets
-                    <div className="p-4 space-y-3 overflow-y-auto h-full">
+                    <div className="p-4 space-y-3">
                         {filteredAndSortedLinks.map((link) => (
                             <LinkCard
                                 key={link.url}
