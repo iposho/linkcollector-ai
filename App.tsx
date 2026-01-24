@@ -202,8 +202,7 @@ const App: React.FC = () => {
     return (
       <SuccessScreen
         onClose={() => {
-          setStatus(AppStatus.IDLE);
-          handleCapture();
+          window.close();
         }}
       />
     );
