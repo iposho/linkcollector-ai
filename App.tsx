@@ -26,7 +26,7 @@ import { useLinks } from './src/hooks/useLinks';
 import { useCapture } from './src/hooks/useCapture';
 
 // Utils
-import { isUrlSaved, removeSavedUrl as removeUrlFromStorage } from './src/utils/storage';
+import { isUrlSaved } from './src/utils/storage';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
@@ -170,11 +170,18 @@ const App: React.FC = () => {
     loadLinks(); // Load links in background (skeleton will show while loading)
   };
 
-  const handleRemoveFromSaved = () => {
+  const handleRemoveFromSaved = async () => {
     if (metadata) {
-      removeUrlFromStorage(metadata.url);
-      setStatus(AppStatus.IDLE);
-      setShowRemoveModal(false);
+      try {
+        setStatus(AppStatus.SAVING);
+        await deleteLink(metadata.url);
+        setStatus(AppStatus.IDLE);
+      } catch (err: any) {
+        setError(err.message || 'Ошибка удаления');
+        setStatus(AppStatus.IDLE);
+      } finally {
+        setShowRemoveModal(false);
+      }
     }
   };
 

@@ -24,23 +24,7 @@
 npm install
 ```
 
-### Шаг 2: Настройка переменных окружения
-
-Создайте файл `.env.local` в корне проекта:
-
-```bash
-cp .env.example .env.local
-```
-
-Откройте `.env.local` и укажите ваш Cerebras API ключ:
-
-```
-CEREBRAS_API_KEY=ваш_ключ_здесь
-```
-
-> **Примечание:** Как получить Cerebras API ключ описано в разделе [Настройка](#настройка).
-
-### Шаг 3: Сборка расширения
+### Шаг 2: Сборка расширения
 
 Выполните команду для сборки расширения:
 
@@ -50,7 +34,7 @@ npm run build
 
 После успешной сборки в папке `dist` будет создана готовая версия расширения.
 
-### Шаг 4: Загрузка расширения в Chrome
+### Шаг 3: Загрузка расширения в Chrome
 
 1. Откройте Chrome и перейдите по адресу `chrome://extensions/`
 2. Включите **"Режим разработчика"** (переключатель в правом верхнем углу)
@@ -58,7 +42,7 @@ npm run build
 4. Выберите папку `dist` из корня проекта
 5. Расширение будет установлено и появится в списке расширений
 
-### Шаг 5: Проверка установки
+### Шаг 4: Проверка установки
 
 После установки вы увидите иконку расширения в панели инструментов Chrome. Нажмите на неё, чтобы открыть popup расширения.
 
@@ -71,7 +55,7 @@ npm run build
 3. Перейдите в раздел API Keys или Settings
 4. Создайте новый API ключ (бесплатный тариф доступен)
 5. Скопируйте созданный ключ
-6. Вставьте его в файл `.env.local` как `CEREBRAS_API_KEY`
+6. Вставьте его в настройки расширения (раздел "Настройки" -> "Cerebras API Key")
 
 > **Важно:** 
 > - Cerebras предоставляет бесплатный тариф с ограничениями по количеству запросов
@@ -82,239 +66,31 @@ npm run build
 
 Для сохранения ссылок в Google Sheets необходимо настроить Google Apps Script:
 
-#### 1. Создание Google Таблицы
+#### 1. Копирование шаблона
 
-1. Создайте новую Google Таблицу на [sheets.google.com](https://sheets.google.com)
-2. Назовите её, например, "Мои ссылки"
-3. Скопируйте ID таблицы из URL (часть между `/d/` и `/edit`)
+1. Откройте [шаблон Google Таблицы](https://docs.google.com/spreadsheets/d/18Wr4hs97QaFEC3UN4Tj8-N3DUK2i4epbaFRSeot9uxA/copy)
+2. Нажмите "Создать копию"
 
-#### 2. Создание Apps Script
+#### 2. Публикация веб-приложения
 
-1. В Google Таблице откройте **Расширения → Apps Script**
-2. Удалите весь код по умолчанию и вставьте следующий:
+1. В созданной копии таблице откройте меню **Расширения** -> **Apps Script**
+2. Откроется редактор кода. Нажмите синюю кнопку **"Начать развертывание"** (Deploy) -> **"Новое развертывание"** (New deployment)
+3. Нажмите на шестеренку (Select type) -> выберите **"Веб-приложение"** (Web app)
+4. Заполните поля:
+   - **Description**: LinkCollector API
+   - **Execute as**: **Me** (от моего имени) — *это важно!*
+   - **Who has access**: **Anyone** (Все) — *это критически важно, иначе расширение не сможет отправлять данные без сложной авторизации*
+5. Нажмите **"Развернуть"** (Deploy)
+6. Скопируйте **Web app URL** (заканчивается на `/exec`)
 
-```javascript
-function doGet(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Reading List');
-    
-    if (!sheet || sheet.getLastRow() < 2) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: true,
-        data: []
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    // Получаем все данные начиная со 2 строки (первая - заголовки)
-    const dataRange = sheet.getRange(2, 1, sheet.getLastRow() - 1, 9);
-    const values = dataRange.getValues();
-    
-    // Преобразуем в массив объектов
-    const links = values.map(row => ({
-      date: row[0] ? new Date(row[0]).toISOString() : '',
-      url: row[1] || '',
-      title: row[2] || '',
-      description: row[3] || '',
-      category: row[4] || '',
-      tags: row[5] ? row[5].split(', ').filter(t => t.trim()) : [],
-      notes: row[6] || '',
-      image: row[7] || '',
-      icon: row[8] || ''
-    }));
-    
-    // Сортируем от новых к старым (по дате, по убыванию)
-    links.sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA; // По убыванию (новые первыми)
-    });
-    
-    return ContentService.createTextOutput(JSON.stringify({
-      success: true,
-      data: links,
-      count: links.length
-    })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({
-      success: false,
-      error: error.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
+#### 3. Настройка расширения
 
-function doPost(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Reading List') || 
-                  SpreadsheetApp.getActiveSpreadsheet().insertSheet('Reading List');
-    
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action || 'create'; // create, update, delete
-    
-    // Установите заголовки, если это первая строка
-    if (sheet.getLastRow() < 1) {
-      sheet.getRange(1, 1, 1, 9).setValues([[
-        'date',
-        'url',
-        'title',
-        'description',
-        'category',
-        'tags',
-        'notes',
-        'image',
-        'icon'
-      ]]);
-      sheet.getRange(1, 1, 1, 9).setFontWeight('bold');
-    }
-    
-    if (action === 'delete') {
-      // Удаление по URL
-      const urlToDelete = data.url;
-      if (!urlToDelete) {
-        throw new Error('URL is required for deletion');
-      }
-      
-      // Проверяем, что есть данные для удаления
-      if (sheet.getLastRow() < 2) {
-        return ContentService.createTextOutput(JSON.stringify({
-          success: false,
-          error: 'No data to delete'
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-      
-      const urlColumn = 2; // URL находится во второй колонке (B)
-      const lastRow = sheet.getLastRow();
-      const dataRange = sheet.getRange(2, urlColumn, lastRow - 1, 1);
-      const urls = dataRange.getValues();
-      
-      let deletedCount = 0;
-      // Идем с конца, чтобы индексы не сбивались при удалении
-      // Удаляем ВСЕ вхождения URL (на случай дубликатов)
-      for (let i = urls.length - 1; i >= 0; i--) {
-        if (urls[i][0] && urls[i][0].toString().trim() === urlToDelete.toString().trim()) {
-          sheet.deleteRow(i + 2); // +2 потому что начинаем со 2 строки (1 - заголовок) и индексы с 0
-          deletedCount++;
-        }
-      }
-      
-      if (deletedCount === 0) {
-        return ContentService.createTextOutput(JSON.stringify({
-          success: false,
-          error: 'Link not found'
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-      
-      return ContentService.createTextOutput(JSON.stringify({success: true}))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    if (action === 'update') {
-      // Обновление существующей записи по URL
-      const urlToUpdate = data.url;
-      if (!urlToUpdate) {
-        throw new Error('URL is required for update');
-      }
-      
-      // Проверяем, что есть данные для обновления
-      if (sheet.getLastRow() < 2) {
-        throw new Error('No data to update');
-      }
-      
-      const urlColumn = 2;
-      const lastRow = sheet.getLastRow();
-      const dataRange = sheet.getRange(2, urlColumn, lastRow - 1, 1);
-      const urls = dataRange.getValues();
-      
-      let rowIndex = -1;
-      for (let i = 0; i < urls.length; i++) {
-        if (urls[i][0] && urls[i][0].toString().trim() === urlToUpdate.toString().trim()) {
-          rowIndex = i + 2; // +2 потому что начинаем со 2 строки (1 - заголовок) и индексы с 0
-          break;
-        }
-      }
-      
-      if (rowIndex === -1) {
-        throw new Error('Link not found');
-      }
-      
-      // Получаем оригинальную дату из существующей строки
-      const existingDate = sheet.getRange(rowIndex, 1).getValue();
-      
-      const row = [
-        existingDate || (data.date ? new Date(data.date) : new Date()), // Сохраняем оригинальную дату
-        data.url,
-        data.title,
-        data.description || '',
-        data.category || 'Прочее',
-        data.tags ? data.tags.join(', ') : '',
-        data.notes || '',
-        data.image || '',
-        data.favicon || ''
-      ];
-      
-      sheet.getRange(rowIndex, 1, 1, 9).setValues([row]);
-      
-      return ContentService.createTextOutput(JSON.stringify({success: true}))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    // Создание новой записи (по умолчанию)
-    // Сначала проверяем, не существует ли уже такая ссылка
-    const urlToCheck = data.url;
-    let existingRowIndex = -1;
-    
-    if (sheet.getLastRow() >= 2) {
-      const urlColumn = 2;
-      const lastRow = sheet.getLastRow();
-      const dataRange = sheet.getRange(2, urlColumn, lastRow - 1, 1);
-      const urls = dataRange.getValues();
-      
-      for (let i = 0; i < urls.length; i++) {
-        if (urls[i][0] && urls[i][0].toString().trim() === urlToCheck.toString().trim()) {
-          existingRowIndex = i + 2; // +2 потому что начинаем со 2 строки (1 - заголовок) и индексы с 0
-          break;
-        }
-      }
-    }
-    
-    if (existingRowIndex > 0) {
-      // Обновляем существующую запись вместо создания дубликата
-      const existingDate = sheet.getRange(existingRowIndex, 1).getValue();
-      const row = [
-        existingDate || new Date(), // Сохраняем оригинальную дату
-        data.url,
-        data.title,
-        data.description || '',
-        data.category || 'Прочее',
-        data.tags ? data.tags.join(', ') : '',
-        data.notes || '',
-        data.image || '',
-        data.favicon || ''
-      ];
-      sheet.getRange(existingRowIndex, 1, 1, 9).setValues([row]);
-    } else {
-      // Создаем новую запись
-      const row = [
-        new Date(),
-        data.url,
-        data.title,
-        data.description || '',
-        data.category || 'Прочее',
-        data.tags ? data.tags.join(', ') : '',
-        data.notes || '',
-        data.image || '',
-        data.favicon || ''
-      ];
-      sheet.appendRow(row);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify({success: true}))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({success: false, error: error.toString()}))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-```
+1. Откройте расширение LinkCollector AI
+2. Перейдите в настройки (⚙️)
+3. Вставьте скопированный URL в поле **"Google Apps Script URL"**
+4. Сохраните настройки
+
+> **Примечание:** Если вы захотите изменить скрипт, код находится в файле `Code.gs` внутри редактора Apps Script.
 
 3. Сохраните проект (Ctrl+S или Cmd+S)
 4. Нажмите **"Развернуть" → "Новое развертывание"**
@@ -563,7 +339,7 @@ npm run clean
 
 ### ИИ-анализ не работает
 
-- Проверьте, что `CEREBRAS_API_KEY` правильно указан в `.env.local`
+- Проверьте, что `CEREBRAS_API_KEY` правильно указан в настройках расширения
 - Убедитесь, что ключ действителен и не истёк
 - Проверьте консоль браузера на наличие ошибок
 

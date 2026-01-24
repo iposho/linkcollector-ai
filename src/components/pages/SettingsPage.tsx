@@ -92,7 +92,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                     <p className="text-[10px] text-slate-400 italic">
-                        Сюда будут отправляться POST-запросы с данными
+                        Сюда будут отправляться POST-запросы с данными. <a href="https://docs.google.com/spreadsheets/d/18Wr4hs97QaFEC3UN4Tj8-N3DUK2i4epbaFRSeot9uxA/copy" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">Скопировать шаблон таблицы</a>
                     </p>
                 </div>
 
