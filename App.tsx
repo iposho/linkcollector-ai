@@ -39,7 +39,12 @@ const App: React.FC = () => {
 
   // Hooks
   const { settings, setSettings, saveSettings, categories, addCategory, clearCache, syncCategories } = useSettings();
-  const { savedLinks, loading: linksLoading, error: linksError, loadLinks, saveLink, updateLink, deleteLink, setError: setLinksError } = useLinks({ scriptUrl: settings.scriptUrl });
+  const { savedLinks, loading: linksLoading, error: linksError, loadLinks, saveLink, updateLink, deleteLink, setError: setLinksError } = useLinks({
+    scriptUrl: settings.scriptUrl,
+    storageProvider: settings.storageProvider,
+    notionToken: settings.notionToken,
+    notionDatabaseId: settings.notionDatabaseId,
+  });
   const { captureTab, loading: captureLoading, error: captureError, setError: setCaptureError } = useCapture();
 
   // Combined error
@@ -70,7 +75,7 @@ const App: React.FC = () => {
 
     if (settings.autoAiAnalysis) {
       setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.ANALYZING);
-      const aiData = await analyzePageContent(extracted, settings.cerebrasApiKey, categories);
+      const aiData = await analyzePageContent(extracted, settings.cerebrasApiKey, categories, settings.cerebrasModel);
       setCategory(aiData.category);
       setTags(aiData.tags);
       setNotes(aiData.summary);
@@ -89,9 +94,21 @@ const App: React.FC = () => {
 
   // Handlers
   const handleSave = async () => {
-    if (!metadata || !settings.scriptUrl) {
-      if (!settings.scriptUrl) {
-        setError("Укажите Script URL в настройках");
+    const isGoogleSheets = settings.storageProvider === 'google_sheets';
+    const isNotion = settings.storageProvider === 'notion';
+
+    const missingConfig = isGoogleSheets
+      ? !settings.scriptUrl
+      : isNotion
+        ? (!settings.notionToken || !settings.notionDatabaseId)
+        : true;
+
+    if (!metadata || missingConfig) {
+      if (missingConfig) {
+        setError(isNotion
+          ? 'Укажите Notion Token и Database ID в настройках'
+          : 'Укажите Script URL в настройках'
+        );
         setStatus(AppStatus.SETTINGS);
       }
       return;
@@ -111,7 +128,7 @@ const App: React.FC = () => {
       });
       setStatus(AppStatus.SUCCESS);
     } catch (err: any) {
-      setError(err.message || "Ошибка при отправке в Google Sheets");
+      setError(err.message || "Ошибка при сохранении ссылки");
       setStatus(AppStatus.IDLE);
     }
   };
@@ -315,7 +332,7 @@ const App: React.FC = () => {
       <footer className="p-5 border-t bg-white flex gap-3">
         <Button
           onClick={handleSave}
-          disabled={!metadata || status === AppStatus.SAVING || !settings.scriptUrl}
+          disabled={!metadata || status === AppStatus.SAVING || (settings.storageProvider === 'google_sheets' && !settings.scriptUrl) || (settings.storageProvider === 'notion' && (!settings.notionToken || !settings.notionDatabaseId))}
           loading={status === AppStatus.SAVING}
           icon={<Database className="w-5 h-5" />}
           className="flex-[1.3]"

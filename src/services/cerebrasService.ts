@@ -2,7 +2,7 @@ import { PageMetadata } from "../../types";
 
 const CEREBRAS_API_URL = "https://api.cerebras.ai/v1/chat/completions";
 
-export const analyzePageContent = async (metadata: PageMetadata, apiKey: string, categories: string[] = []) => {
+export const analyzePageContent = async (metadata: PageMetadata, apiKey: string, categories: string[] = [], model: string = 'llama3.1-8b') => {
   try {
     if (!apiKey) {
       throw new Error("Cerebras API key not configured");
@@ -29,7 +29,7 @@ Description: ${metadata.description}
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b',
+        model: model,
         messages: [
           {
             role: 'user',
@@ -74,7 +74,7 @@ Description: ${metadata.description}
 /**
  * Validates the Cerebras API key by making a minimal request
  */
-export const validateCerebrasApiKey = async (apiKey: string): Promise<{ success: boolean; error?: string }> => {
+export const validateCerebrasApiKey = async (apiKey: string, model: string = 'llama3.1-8b'): Promise<{ success: boolean; error?: string }> => {
   if (!apiKey) {
     return { success: false, error: "API ключ не введён" };
   }
@@ -87,7 +87,7 @@ export const validateCerebrasApiKey = async (apiKey: string): Promise<{ success:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b',
+        model: model,
         messages: [
           {
             role: 'user',

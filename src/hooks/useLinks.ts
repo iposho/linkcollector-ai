@@ -1,18 +1,43 @@
 import { useState, useCallback } from 'react';
-import { SavedLink } from '../../types';
+import { SavedLink, StorageProvider } from '../../types';
 import * as storage from '../utils/storage';
 import { compressImage, imageToBase64 } from '../utils/imageUtils';
+import * as notionService from '../services/notionService';
 
 interface UseLinksOptions {
     scriptUrl: string;
+    storageProvider: StorageProvider;
+    notionToken: string;
+    notionDatabaseId: string;
 }
 
-export const useLinks = ({ scriptUrl }: UseLinksOptions) => {
+export const useLinks = ({ scriptUrl, storageProvider, notionToken, notionDatabaseId }: UseLinksOptions) => {
     const [savedLinks, setSavedLinks] = useState<SavedLink[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const loadLinks = useCallback(async () => {
+        if (storageProvider === 'notion') {
+            if (!notionToken || !notionDatabaseId) {
+                setError('Укажите Notion Token и Database ID в настройках');
+                return [];
+            }
+            try {
+                setLoading(true);
+                setError(null);
+                const links = await notionService.queryLinks(notionToken, notionDatabaseId);
+                setSavedLinks(links);
+                return links;
+            } catch (err: any) {
+                console.error('Ошибка загрузки ссылок из Notion:', err);
+                setError(err.message || 'Ошибка при загрузке списка ссылок из Notion');
+                return [];
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Google Sheets
         if (!scriptUrl) {
             setError('Укажите Script URL в настройках');
             return [];
@@ -42,24 +67,10 @@ export const useLinks = ({ scriptUrl }: UseLinksOptions) => {
         } finally {
             setLoading(false);
         }
-    }, [scriptUrl]);
+    }, [scriptUrl, storageProvider, notionToken, notionDatabaseId]);
 
-    const saveLink = useCallback(async (linkData: {
-        url: string;
-        title: string;
-        description: string;
-        image: string;
-        favicon: string;
-        category: string;
-        tags: string[];
-        notes: string;
-    }) => {
-        if (!scriptUrl) {
-            throw new Error('Укажите Script URL в настройках');
-        }
-
-        // Process image
-        let imageBase64 = linkData.image;
+    const processImage = async (image: string): Promise<string> => {
+        let imageBase64 = image;
         if (imageBase64 && !imageBase64.startsWith('data:') && !imageBase64.includes('picsum.photos')) {
             try {
                 imageBase64 = await imageToBase64(imageBase64);
@@ -75,6 +86,41 @@ export const useLinks = ({ scriptUrl }: UseLinksOptions) => {
                 console.warn('Не удалось сжать изображение:', err);
             }
         }
+        return imageBase64;
+    };
+
+    const saveLink = useCallback(async (linkData: {
+        url: string;
+        title: string;
+        description: string;
+        image: string;
+        favicon: string;
+        category: string;
+        tags: string[];
+        notes: string;
+    }) => {
+        if (storageProvider === 'notion') {
+            if (!notionToken || !notionDatabaseId) {
+                throw new Error('Укажите Notion Token и Database ID в настройках');
+            }
+            const wasAlreadySaved = storage.isUrlSaved(linkData.url);
+            if (wasAlreadySaved) {
+                await notionService.updateLink(notionToken, notionDatabaseId, linkData.url, {
+                    ...linkData,
+                });
+            } else {
+                await notionService.createLink(notionToken, notionDatabaseId, linkData);
+                storage.addSavedUrl(linkData.url);
+            }
+            return;
+        }
+
+        // Google Sheets
+        if (!scriptUrl) {
+            throw new Error('Укажите Script URL в настройках');
+        }
+
+        const imageBase64 = await processImage(linkData.image);
 
         const wasAlreadySaved = storage.isUrlSaved(linkData.url);
         const action = wasAlreadySaved ? 'update' : 'create';
@@ -94,7 +140,7 @@ export const useLinks = ({ scriptUrl }: UseLinksOptions) => {
         if (!wasAlreadySaved) {
             storage.addSavedUrl(linkData.url);
         }
-    }, [scriptUrl]);
+    }, [scriptUrl, storageProvider, notionToken, notionDatabaseId]);
 
     const updateLink = useCallback(async (originalUrl: string, linkData: {
         url: string;
@@ -107,26 +153,20 @@ export const useLinks = ({ scriptUrl }: UseLinksOptions) => {
         notes: string;
         date?: string;
     }) => {
+        if (storageProvider === 'notion') {
+            if (!notionToken || !notionDatabaseId) {
+                throw new Error('Укажите Notion Token и Database ID в настройках');
+            }
+            await notionService.updateLink(notionToken, notionDatabaseId, originalUrl, linkData);
+            return;
+        }
+
+        // Google Sheets
         if (!scriptUrl) {
             throw new Error('Укажите Script URL в настройках');
         }
 
-        let imageBase64 = linkData.image;
-        if (imageBase64 && !imageBase64.startsWith('data:') && !imageBase64.includes('picsum.photos')) {
-            try {
-                imageBase64 = await imageToBase64(imageBase64);
-            } catch (err) {
-                console.warn('Не удалось конвертировать изображение в base64:', err);
-            }
-        }
-
-        if (imageBase64 && imageBase64.startsWith('data:')) {
-            try {
-                imageBase64 = await compressImage(imageBase64, 600);
-            } catch (err) {
-                console.warn('Не удалось сжать изображение:', err);
-            }
-        }
+        const imageBase64 = await processImage(linkData.image);
 
         await fetch(scriptUrl, {
             method: 'POST',
@@ -134,23 +174,33 @@ export const useLinks = ({ scriptUrl }: UseLinksOptions) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'update',
-                url: originalUrl,
                 ...linkData,
+                url: originalUrl,
                 image: imageBase64
             })
         });
-    }, [scriptUrl]);
+    }, [scriptUrl, storageProvider, notionToken, notionDatabaseId]);
 
     const deleteLink = useCallback(async (url: string) => {
+        if (storageProvider === 'notion') {
+            if (!notionToken || !notionDatabaseId) {
+                throw new Error('Укажите Notion Token и Database ID в настройках');
+            }
+            storage.removeSavedUrl(url);
+            setSavedLinks(prev => prev.filter(link => link.url !== url));
+            await notionService.deleteLink(notionToken, notionDatabaseId, url);
+            setTimeout(() => loadLinks(), 500);
+            return;
+        }
+
+        // Google Sheets
         if (!scriptUrl) {
             throw new Error('Укажите Script URL в настройках');
         }
 
-        // Update local state immediately
         storage.removeSavedUrl(url);
         setSavedLinks(prev => prev.filter(link => link.url !== url));
 
-        // Send delete request
         await fetch(scriptUrl, {
             method: 'POST',
             mode: 'no-cors',
@@ -161,9 +211,8 @@ export const useLinks = ({ scriptUrl }: UseLinksOptions) => {
             })
         });
 
-        // Reload to sync
         setTimeout(() => loadLinks(), 500);
-    }, [scriptUrl, loadLinks]);
+    }, [scriptUrl, storageProvider, notionToken, notionDatabaseId, loadLinks]);
 
     const filterLinks = useCallback((query: string) => {
         if (!query) return savedLinks;

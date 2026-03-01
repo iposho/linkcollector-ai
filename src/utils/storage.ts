@@ -34,33 +34,51 @@ export const saveCategories = (categories: string[]): void => {
 };
 
 export const getSettings = () => ({
+    storageProvider: (localStorage.getItem('storage_provider') || 'google_sheets') as 'google_sheets' | 'notion',
     spreadsheetId: localStorage.getItem('gs_id') || '',
     scriptUrl: localStorage.getItem('gs_script_url') || '',
+    notionToken: localStorage.getItem('notion_token') || '',
+    notionDatabaseId: localStorage.getItem('notion_database_id') || '',
     autoAiAnalysis: localStorage.getItem('auto_ai') !== 'false',
     folderName: localStorage.getItem('folder_name') || 'Reading List',
-    cerebrasApiKey: localStorage.getItem('cerebras_api_key') || ''
+    cerebrasApiKey: localStorage.getItem('cerebras_api_key') || '',
+    cerebrasModel: localStorage.getItem('cerebras_model') || 'llama3.1-8b'
 });
 
 export const saveSettings = (settings: {
+    storageProvider: string;
     spreadsheetId: string;
     scriptUrl: string;
+    notionToken: string;
+    notionDatabaseId: string;
     autoAiAnalysis: boolean;
     folderName: string;
     cerebrasApiKey: string;
+    cerebrasModel?: string;
 }): void => {
+    localStorage.setItem('storage_provider', settings.storageProvider);
     localStorage.setItem('gs_id', settings.spreadsheetId);
     localStorage.setItem('gs_script_url', settings.scriptUrl);
+    localStorage.setItem('notion_token', settings.notionToken);
+    localStorage.setItem('notion_database_id', settings.notionDatabaseId);
     localStorage.setItem('auto_ai', String(settings.autoAiAnalysis));
     localStorage.setItem('folder_name', settings.folderName);
     localStorage.setItem('cerebras_api_key', settings.cerebrasApiKey);
+    if (settings.cerebrasModel) {
+        localStorage.setItem('cerebras_model', settings.cerebrasModel);
+    }
 };
 
 export const clearAllCache = (): void => {
     localStorage.removeItem('saved_links');
     localStorage.removeItem('categories');
+    localStorage.removeItem('storage_provider');
     localStorage.removeItem('gs_id');
     localStorage.removeItem('gs_script_url');
+    localStorage.removeItem('notion_token');
+    localStorage.removeItem('notion_database_id');
     localStorage.removeItem('auto_ai');
     localStorage.removeItem('folder_name');
     localStorage.removeItem('cerebras_api_key');
+    localStorage.removeItem('cerebras_model');
 };

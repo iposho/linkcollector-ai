@@ -26,11 +26,15 @@ export const useSettings = () => {
         storage.clearAllCache();
         setCategories(DEFAULT_CATEGORIES);
         setSettings({
+            storageProvider: 'google_sheets',
             spreadsheetId: '',
             scriptUrl: '',
+            notionToken: '',
+            notionDatabaseId: '',
             autoAiAnalysis: true,
             folderName: 'Reading List',
-            cerebrasApiKey: ''
+            cerebrasApiKey: '',
+            cerebrasModel: 'llama3.1-8b'
         });
     }, []);
 

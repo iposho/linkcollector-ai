@@ -19,12 +19,21 @@ export interface SavedLink {
   icon: string;
 }
 
+export type StorageProvider = 'google_sheets' | 'notion';
+
 export interface AppSettings {
+  storageProvider: StorageProvider;
+  // Google Sheets
   spreadsheetId: string;
   scriptUrl: string; // URL для Google Apps Script Web App
+  // Notion
+  notionToken: string; // Notion Internal Integration Token
+  notionDatabaseId: string; // ID базы данных Notion
+  // AI
   autoAiAnalysis: boolean;
   folderName: string;
   cerebrasApiKey: string; // API ключ для Cerebras AI
+  cerebrasModel?: string; // Модель для Cerebras AI
 }
 
 export enum AppStatus {
