@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Trash2, Copy, Check, Info, Database, ShieldCheck, ShieldAlert, BookOpen } from 'lucide-react';
-import { AppSettings, StorageProvider } from '../../../types';
+import { AppSettings, StorageProvider, AiProvider } from '../../../types';
 import { Header, Button, Modal } from '../common';
 import { validateCerebrasApiKey } from '../../services/cerebrasService';
+import { validateGeminiApiKey } from '../../services/geminiService';
 import { validateConnection as validateNotionConnection } from '../../services/notionService';
 
 interface SettingsPageProps {
@@ -119,8 +120,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         <button
                             onClick={() => handleProviderChange('google_sheets')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${settings.storageProvider === 'google_sheets'
-                                    ? 'bg-white text-indigo-700 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
+                                ? 'bg-white text-indigo-700 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
                                 }`}
                         >
                             <Database className="w-3.5 h-3.5" />
@@ -129,8 +130,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         <button
                             onClick={() => handleProviderChange('notion')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${settings.storageProvider === 'notion'
-                                    ? 'bg-white text-indigo-700 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
+                                ? 'bg-white text-indigo-700 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
                                 }`}
                         >
                             <BookOpen className="w-3.5 h-3.5" />
@@ -268,7 +269,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 {/* AI Toggle */}
                 <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <div>
-                        <span className="text-sm font-bold text-slate-700">ИИ-анализ (Cerebras)</span>
+                        <span className="text-sm font-bold text-slate-700">ИИ-анализ</span>
                         <p className="text-[11px] text-slate-500">Автоматически подбирать теги</p>
                     </div>
                     <button
@@ -282,66 +283,186 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     </button>
                 </div>
 
-                {/* Cerebras API Key */}
+                {/* AI Provider Settings */}
                 {settings.autoAiAnalysis && (
-                    <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                        {/* AI Provider Selector */}
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Cerebras API Key
+                                Провайдер ИИ
                             </label>
-                            <input
-                                type="password"
-                                value={settings.cerebrasApiKey || ''}
-                                onChange={(e) => {
-                                    onSettingsChange({ ...settings, cerebrasApiKey: e.target.value });
-                                    setValidationResult(null);
-                                }}
-                                placeholder="csk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                            />
+                            <div className="flex bg-slate-100 rounded-xl p-1">
+                                <button
+                                    onClick={() => {
+                                        onSettingsChange({ ...settings, aiProvider: 'cerebras' });
+                                        setValidationResult(null);
+                                    }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${settings.aiProvider === 'cerebras'
+                                        ? 'bg-white text-indigo-700 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Cerebras
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onSettingsChange({ ...settings, aiProvider: 'google_gemini' });
+                                        setValidationResult(null);
+                                    }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${settings.aiProvider === 'google_gemini'
+                                        ? 'bg-white text-indigo-700 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Google Gemini
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Модель Cerebras
-                            </label>
-                            <select
-                                value={settings.cerebrasModel || 'llama3.1-8b'}
-                                onChange={(e) => onSettingsChange({ ...settings, cerebrasModel: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="llama3.1-8b">llama3.1-8b</option>
-                                <option value="gpt-oss-120b">gpt-oss-120b</option>
-                            </select>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={handleTestConnection}
-                                loading={isValidating}
-                                className="text-[11px] h-9"
-                                icon={!isValidating && <ShieldCheck className="w-3.5 h-3.5" />}
-                            >
-                                Проверить соединение
-                            </Button>
-
-                            {validationResult && (
-                                <div className={`flex items-center gap-1.5 text-[11px] font-medium animate-in fade-in slide-in-from-left-2 ${validationResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                                    {validationResult.success ? (
-                                        <ShieldCheck className="w-3.5 h-3.5" />
-                                    ) : (
-                                        <ShieldAlert className="w-3.5 h-3.5" />
-                                    )}
-                                    <span className="truncate max-w-[150px]">{validationResult.message}</span>
+                        {/* Cerebras Settings */}
+                        {settings.aiProvider === 'cerebras' && (
+                            <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Cerebras API Key
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={settings.cerebrasApiKey || ''}
+                                        onChange={(e) => {
+                                            onSettingsChange({ ...settings, cerebrasApiKey: e.target.value });
+                                            setValidationResult(null);
+                                        }}
+                                        placeholder="csk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                                    />
                                 </div>
-                            )}
-                        </div>
 
-                        <p className="text-[10px] text-slate-400 italic">
-                            Получить ключ: <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">cloud.cerebras.ai</a> (бесплатно)
-                        </p>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Модель Cerebras
+                                    </label>
+                                    <select
+                                        value={settings.cerebrasModel || 'llama3.1-8b'}
+                                        onChange={(e) => onSettingsChange({ ...settings, cerebrasModel: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="llama3.1-8b">llama3.1-8b</option>
+                                        <option value="gpt-oss-120b">gpt-oss-120b</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleTestConnection}
+                                        loading={isValidating}
+                                        className="text-[11px] h-9"
+                                        icon={!isValidating && <ShieldCheck className="w-3.5 h-3.5" />}
+                                    >
+                                        Проверить соединение
+                                    </Button>
+
+                                    {validationResult && (
+                                        <div className={`flex items-center gap-1.5 text-[11px] font-medium animate-in fade-in slide-in-from-left-2 ${validationResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                            {validationResult.success ? (
+                                                <ShieldCheck className="w-3.5 h-3.5" />
+                                            ) : (
+                                                <ShieldAlert className="w-3.5 h-3.5" />
+                                            )}
+                                            <span className="truncate max-w-[150px]">{validationResult.message}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p className="text-[10px] text-slate-400 italic">
+                                    Получить ключ: <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">cloud.cerebras.ai</a> (бесплатно)
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Google Gemini Settings */}
+                        {settings.aiProvider === 'google_gemini' && (
+                            <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Google Gemini API Key
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={settings.geminiApiKey || ''}
+                                        onChange={(e) => {
+                                            onSettingsChange({ ...settings, geminiApiKey: e.target.value });
+                                            setValidationResult(null);
+                                        }}
+                                        placeholder="AIzaSy..."
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Модель Gemini
+                                    </label>
+                                    <select
+                                        value={settings.geminiModel || 'gemini-2.5-flash'}
+                                        onChange={(e) => onSettingsChange({ ...settings, geminiModel: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={async () => {
+                                            if (!settings.geminiApiKey) {
+                                                setValidationResult({ success: false, message: 'Сначала введите API ключ' });
+                                                return;
+                                            }
+                                            setIsValidating(true);
+                                            setValidationResult(null);
+                                            try {
+                                                const result = await validateGeminiApiKey(settings.geminiApiKey, settings.geminiModel);
+                                                if (result.success) {
+                                                    setValidationResult({ success: true, message: 'Соединение установлено!' });
+                                                } else {
+                                                    setValidationResult({ success: false, message: result.error || 'Ошибка проверки' });
+                                                }
+                                            } catch (err) {
+                                                setValidationResult({ success: false, message: 'Ошибка сети' });
+                                            } finally {
+                                                setIsValidating(false);
+                                            }
+                                        }}
+                                        loading={isValidating}
+                                        className="text-[11px] h-9"
+                                        icon={!isValidating && <ShieldCheck className="w-3.5 h-3.5" />}
+                                    >
+                                        Проверить соединение
+                                    </Button>
+
+                                    {validationResult && (
+                                        <div className={`flex items-center gap-1.5 text-[11px] font-medium animate-in fade-in slide-in-from-left-2 ${validationResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                            {validationResult.success ? (
+                                                <ShieldCheck className="w-3.5 h-3.5" />
+                                            ) : (
+                                                <ShieldAlert className="w-3.5 h-3.5" />
+                                            )}
+                                            <span className="truncate max-w-[150px]">{validationResult.message}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p className="text-[10px] text-slate-400 italic">
+                                    Получить ключ: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">aistudio.google.com</a> (бесплатно)
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 

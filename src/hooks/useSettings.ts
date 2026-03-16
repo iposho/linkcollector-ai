@@ -32,9 +32,12 @@ export const useSettings = () => {
             notionToken: '',
             notionDatabaseId: '',
             autoAiAnalysis: true,
+            aiProvider: 'cerebras',
             folderName: 'Reading List',
             cerebrasApiKey: '',
-            cerebrasModel: 'llama3.1-8b'
+            cerebrasModel: 'llama3.1-8b',
+            geminiApiKey: '',
+            geminiModel: 'gemini-2.5-flash'
         });
     }, []);
 

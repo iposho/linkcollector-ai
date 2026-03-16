@@ -8,7 +8,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { PageMetadata, AppStatus, SavedLink } from './types';
-import { analyzePageContent } from './src/services/cerebrasService';
+import { analyzePageContent as cerebrasAnalyze } from './src/services/cerebrasService';
+import { analyzePageContent as geminiAnalyze } from './src/services/geminiService';
 
 // Components
 import { Header, Button, Modal } from './src/components/common';
@@ -75,14 +76,21 @@ const App: React.FC = () => {
 
     if (settings.autoAiAnalysis) {
       setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.ANALYZING);
-      const aiData = await analyzePageContent(extracted, settings.cerebrasApiKey, categories, settings.cerebrasModel);
+
+      let aiData;
+      if (settings.aiProvider === 'google_gemini') {
+        aiData = await geminiAnalyze(extracted, settings.geminiApiKey, categories, settings.geminiModel);
+      } else {
+        aiData = await cerebrasAnalyze(extracted, settings.cerebrasApiKey, categories, settings.cerebrasModel);
+      }
+
       setCategory(aiData.category);
       setTags(aiData.tags);
       setNotes(aiData.summary);
     }
 
     setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.IDLE);
-  }, [captureTab, settings.autoAiAnalysis, settings.cerebrasApiKey, categories]);
+  }, [captureTab, settings.autoAiAnalysis, settings.cerebrasApiKey, settings.geminiApiKey, settings.aiProvider, categories]);
 
   useEffect(() => {
     handleCapture();
@@ -279,7 +287,7 @@ const App: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-24 space-y-4">
             <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">
-              {status === AppStatus.EXTRACTING ? 'Захватываем страницу...' : 'Cerebras анализирует...'}
+              {status === AppStatus.EXTRACTING ? 'Захватываем страницу...' : `${settings.aiProvider === 'google_gemini' ? 'Gemini' : 'Cerebras'} анализирует...`}
             </p>
           </div>
         ) : metadata ? (

@@ -20,6 +20,7 @@ export interface SavedLink {
 }
 
 export type StorageProvider = 'google_sheets' | 'notion';
+export type AiProvider = 'cerebras' | 'google_gemini';
 
 export interface AppSettings {
   storageProvider: StorageProvider;
@@ -31,9 +32,12 @@ export interface AppSettings {
   notionDatabaseId: string; // ID базы данных Notion
   // AI
   autoAiAnalysis: boolean;
+  aiProvider: AiProvider; // Провайдер ИИ-анализа
   folderName: string;
   cerebrasApiKey: string; // API ключ для Cerebras AI
   cerebrasModel?: string; // Модель для Cerebras AI
+  geminiApiKey: string; // API ключ для Google Gemini
+  geminiModel?: string; // Модель для Google Gemini
 }
 
 export enum AppStatus {
