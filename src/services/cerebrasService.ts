@@ -1,3 +1,7 @@
+/**
+ * @deprecated Скрыт из UI, заменён на OpenRouter (openRouterService.ts).
+ * Оставлен для обратной совместимости — не удалять, пока у пользователей может быть aiProvider === 'cerebras'.
+ */
 import { PageMetadata } from "../../types";
 
 const CEREBRAS_API_URL = "https://api.cerebras.ai/v1/chat/completions";
@@ -36,8 +40,8 @@ Description: ${metadata.description}
             content: prompt
           }
         ],
-        max_tokens: 512,
-        temperature: 0.7,
+        max_tokens: 2048,
+        temperature: 0.9,
         response_format: { type: 'json_object' }
       })
     });
@@ -62,12 +66,9 @@ Description: ${metadata.description}
       summary: parsed.summary || metadata.description || "Без описания"
     };
   } catch (error) {
-    console.error("Cerebras Analysis Error:", error);
-    return {
-      category: "Прочее",
-      tags: ["web"],
-      summary: metadata.description || "Без описания"
-    };
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Cerebras Analysis Error:", message);
+    throw new Error(message);
   }
 };
 

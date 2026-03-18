@@ -32,12 +32,18 @@ export const useSettings = () => {
             notionToken: '',
             notionDatabaseId: '',
             autoAiAnalysis: true,
-            aiProvider: 'cerebras',
+            aiProvider: 'openrouter',
             folderName: 'Reading List',
             cerebrasApiKey: '',
             cerebrasModel: 'llama3.1-8b',
             geminiApiKey: '',
-            geminiModel: 'gemini-2.5-flash'
+            geminiModel: 'gemini-2.5-flash',
+            groqApiKey: '',
+            groqModel: 'llama-3.3-70b-versatile',
+            openRouterApiKey: '',
+            openRouterModel: 'stepfun/step-3.5-flash:free',
+            sambanovaApiKey: '',
+            sambanovaModel: 'DeepSeek-R1-0528'
         });
     }, []);
 

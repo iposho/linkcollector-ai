@@ -7,9 +7,12 @@ import {
   Info,
   Trash2
 } from 'lucide-react';
-import { PageMetadata, AppStatus, SavedLink } from './types';
-import { analyzePageContent as cerebrasAnalyze } from './src/services/cerebrasService';
+import { PageMetadata, AppStatus, SavedLink, AppSettings } from './types';
+import { analyzePageContent as cerebrasAnalyze } from './src/services/cerebrasService'; // deprecated: скрыт из UI, оставлен для совместимости
+import { analyzePageContent as openRouterAnalyze } from './src/services/openRouterService';
 import { analyzePageContent as geminiAnalyze } from './src/services/geminiService';
+import { analyzePageContent as groqAnalyze } from './src/services/groqService';
+import { analyzePageContent as sambaAnalyze } from './src/services/sambanovaService';
 
 // Components
 import { Header, Button, Modal } from './src/components/common';
@@ -24,10 +27,81 @@ import {
 // Hooks
 import { useSettings } from './src/hooks/useSettings';
 import { useLinks } from './src/hooks/useLinks';
-import { useCapture } from './src/hooks/useCapture';
+import { useCapture, type CaptureOptions } from './src/hooks/useCapture';
 
 // Utils
-import { isUrlSaved } from './src/utils/storage';
+import { isUrlSaved, initFromChromeStorage } from './src/utils/storage';
+import { toSavePayload, type ImportableLink } from './src/utils/importUtils';
+
+/** Короткое имя модели для отображения «Модель X анализирует...» */
+function getAnalyzingModelLabel(settings: AppSettings): string {
+  const p = settings.aiProvider;
+  const m = (s: string | undefined) => s || '';
+  if (p === 'google_gemini') {
+    const id = m(settings.geminiModel);
+    if (id === 'gemini-2.5-flash') return 'Gemini 2.5 Flash';
+    if (id === 'gemini-2.5-flash-lite') return 'Gemini 2.5 Flash-Lite';
+    if (id === 'gemini-2.5-pro') return 'Gemini 2.5 Pro';
+    return id || 'Gemini';
+  }
+  if (p === 'groq') {
+    const id = m(settings.groqModel);
+    const labels: Record<string, string> = {
+      'llama-3.3-70b-versatile': 'Llama 3.3 70B',
+      'llama-3.1-8b-instant': 'Llama 3.1 8B',
+      'meta-llama/llama-4-scout-17b-16e-instruct': 'Llama 4 Scout 17B',
+      'openai/gpt-oss-120b': 'GPT-OSS 120B',
+      'openai/gpt-oss-20b': 'GPT-OSS 20B',
+      'openai/gpt-oss-safeguard-20b': 'GPT-OSS Safeguard 20B',
+      'qwen/qwen3-32b': 'Qwen3 32B',
+      'moonshotai/kimi-k2-instruct': 'Kimi K2',
+      'moonshotai/kimi-k2-instruct-0905': 'Kimi K2 (0905)',
+      'groq/compound': 'Groq Compound',
+      'groq/compound-mini': 'Groq Compound Mini',
+      'allam-2-7b': 'Allam 2 7B',
+      'meta-llama/llama-prompt-guard-2-86m': 'Llama Prompt Guard 86M',
+      'meta-llama/llama-prompt-guard-2-22m': 'Llama Prompt Guard 22M',
+      'canopylabs/orpheus-v1-english': 'Orpheus English',
+      'canopylabs/orpheus-arabic-saudi': 'Orpheus Arabic',
+    };
+    return labels[id] || id.split('/').pop()?.replace(/-/g, ' ') || id;
+  }
+  if (p === 'openrouter' || p === 'cerebras') {
+    const id = m(settings.openRouterModel);
+    const labels: Record<string, string> = {
+      'stepfun/step-3.5-flash:free': 'Step 3.5 Flash',
+      'openrouter/hunter-alpha': 'Hunter Alpha',
+      'arcee-ai/trinity-large-preview:free': 'Trinity Large',
+      'nvidia/nemotron-3-super-120b-a12b:free': 'Nemotron 3 Super',
+      'openrouter/healer-alpha': 'Healer Alpha',
+      'z-ai/glm-4.5-air:free': 'GLM 4.5 Air',
+      'nvidia/nemotron-3-nano-30b-a3b:free': 'Nemotron 3 Nano 30B',
+      'arcee-ai/trinity-mini:free': 'Trinity Mini',
+      'nvidia/nemotron-nano-12b-v2-vl:free': 'Nemotron Nano 12B VL',
+      'nvidia/nemotron-nano-9b-v2:free': 'Nemotron Nano 9B V2',
+      'qwen/qwen3-coder:free': 'Qwen3 Coder 480B',
+      'qwen/qwen3-next-80b-a3b-instruct:free': 'Qwen3 Next 80B',
+      'meta-llama/llama-3.3-70b-instruct:free': 'Llama 3.3 70B',
+      'openai/gpt-oss-120b:free': 'gpt-oss-120b',
+      'liquid/lfm-2.5-1.2b-thinking:free': 'LFM2.5-1.2B',
+      'mistralai/mistral-small-3.1-24b-instruct:free': 'Mistral Small 3.1 24B',
+    };
+    return labels[id] || id.split('/').pop()?.replace(/:free$/, '').replace(/-/g, ' ') || id;
+  }
+  if (p === 'sambanova') {
+    const id = m(settings.sambanovaModel);
+    const labels: Record<string, string> = {
+      'DeepSeek-R1-0528': 'DeepSeek R1-0528',
+      'DeepSeek-R1-Distill-Llama-70B': 'DeepSeek R1 Distill Llama 70B',
+      'DeepSeek-V3-0324': 'DeepSeek V3-0324',
+      'Deepseek-V3.1': 'DeepSeek V3.1',
+      'Meta-Llama-3.3-70B-Instruct': 'Llama 3.3 70B',
+      'Meta-Llama-3.1-8B-Instruct': 'Llama 3.1 8B',
+    };
+    return labels[id] || id || 'SambaNova';
+  }
+  return 'ИИ';
+}
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
@@ -37,6 +111,7 @@ const App: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [editingLink, setEditingLink] = useState<SavedLink | null>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [reAnalyzing, setReAnalyzing] = useState(false);
 
   // Hooks
   const { settings, setSettings, saveSettings, categories, addCategory, clearCache, syncCategories } = useSettings();
@@ -55,12 +130,12 @@ const App: React.FC = () => {
     setCaptureError(err);
   };
 
-  // Capture current tab on mount
-  const handleCapture = useCallback(async () => {
+  // Capture current tab (or context-menu tab/link) on mount
+  const handleCapture = useCallback(async (options?: CaptureOptions) => {
     setStatus(AppStatus.EXTRACTING);
     setError(null);
 
-    const extracted = await captureTab();
+    const extracted = await captureTab(options);
     if (!extracted) {
       setStatus(AppStatus.ERROR);
       setError('Не удалось получить данные вкладки');
@@ -76,28 +151,107 @@ const App: React.FC = () => {
 
     if (settings.autoAiAnalysis) {
       setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.ANALYZING);
-
-      let aiData;
-      if (settings.aiProvider === 'google_gemini') {
-        aiData = await geminiAnalyze(extracted, settings.geminiApiKey, categories, settings.geminiModel);
-      } else {
-        aiData = await cerebrasAnalyze(extracted, settings.cerebrasApiKey, categories, settings.cerebrasModel);
+      try {
+        let aiData;
+        if (settings.aiProvider === 'google_gemini') {
+          aiData = await geminiAnalyze(extracted, settings.geminiApiKey, categories, settings.geminiModel);
+        } else if (settings.aiProvider === 'groq') {
+          aiData = await groqAnalyze(extracted, settings.groqApiKey, categories, settings.groqModel);
+        } else if (settings.aiProvider === 'openrouter') {
+          aiData = await openRouterAnalyze(extracted, settings.openRouterApiKey, categories, settings.openRouterModel);
+        } else if (settings.aiProvider === 'sambanova') {
+          aiData = await sambaAnalyze(extracted, settings.sambanovaApiKey, categories, settings.sambanovaModel);
+        } else if (settings.aiProvider === 'cerebras') {
+          if (settings.cerebrasApiKey) {
+            aiData = await cerebrasAnalyze(extracted, settings.cerebrasApiKey, categories, settings.cerebrasModel);
+          } else {
+            aiData = await openRouterAnalyze(extracted, settings.openRouterApiKey, categories, settings.openRouterModel);
+          }
+        } else {
+          aiData = await cerebrasAnalyze(extracted, settings.cerebrasApiKey, categories, settings.cerebrasModel);
+        }
+        setCategory(aiData.category);
+        setTags(aiData.tags);
+        setNotes(aiData.summary);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Ошибка ИИ-анализа');
+        setStatus(AppStatus.IDLE);
+        return;
       }
-
-      setCategory(aiData.category);
-      setTags(aiData.tags);
-      setNotes(aiData.summary);
     }
 
     setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.IDLE);
-  }, [captureTab, settings.autoAiAnalysis, settings.cerebrasApiKey, settings.geminiApiKey, settings.aiProvider, categories]);
+  }, [captureTab, settings.autoAiAnalysis, settings.cerebrasApiKey, settings.cerebrasModel, settings.geminiApiKey, settings.geminiModel, settings.groqApiKey, settings.groqModel, settings.openRouterApiKey, settings.openRouterModel, settings.sambanovaApiKey, settings.sambanovaModel, settings.aiProvider, categories]);
+
+  const handleReAnalyze = useCallback(async () => {
+    if (!metadata) return;
+    const hasAi =
+      (settings.aiProvider === 'google_gemini' && settings.geminiApiKey) ||
+      (settings.aiProvider === 'groq' && settings.groqApiKey) ||
+      (settings.aiProvider === 'openrouter' && settings.openRouterApiKey) ||
+      (settings.aiProvider === 'sambanova' && settings.sambanovaApiKey) ||
+      (settings.aiProvider === 'cerebras' && (settings.openRouterApiKey || settings.cerebrasApiKey));
+    if (!hasAi) {
+      setError('Укажите API ключ ИИ в настройках');
+      return;
+    }
+    setReAnalyzing(true);
+    setError(null);
+    try {
+      let aiData;
+      if (settings.aiProvider === 'google_gemini') {
+        aiData = await geminiAnalyze(metadata, settings.geminiApiKey, categories, settings.geminiModel);
+      } else if (settings.aiProvider === 'groq') {
+        aiData = await groqAnalyze(metadata, settings.groqApiKey, categories, settings.groqModel);
+      } else if (settings.aiProvider === 'openrouter') {
+        aiData = await openRouterAnalyze(metadata, settings.openRouterApiKey, categories, settings.openRouterModel);
+      } else if (settings.aiProvider === 'sambanova') {
+        aiData = await sambaAnalyze(metadata, settings.sambanovaApiKey, categories, settings.sambanovaModel);
+      } else if (settings.aiProvider === 'cerebras') {
+        if (settings.cerebrasApiKey) {
+          aiData = await cerebrasAnalyze(metadata, settings.cerebrasApiKey, categories, settings.cerebrasModel);
+        } else {
+          aiData = await openRouterAnalyze(metadata, settings.openRouterApiKey, categories, settings.openRouterModel);
+        }
+      } else {
+        aiData = await cerebrasAnalyze(metadata, settings.cerebrasApiKey, categories, settings.cerebrasModel);
+      }
+      setCategory(aiData.category);
+      setTags(aiData.tags);
+      setNotes(aiData.summary);
+    } catch (err: any) {
+      setError(err?.message || 'Ошибка ИИ-анализа');
+    } finally {
+      setReAnalyzing(false);
+    }
+  }, [metadata, settings, categories]);
 
   useEffect(() => {
-    handleCapture();
-    // Load links on mount to sync categories early
-    loadLinks().then(links => {
-      if (links) syncCategories(links);
-    });
+    const runCapture = (contextOptions?: CaptureOptions) => {
+      handleCapture(contextOptions);
+      loadLinks().then(links => {
+        if (links) syncCategories(links);
+      });
+    };
+
+    const ch = typeof globalThis !== 'undefined' && (globalThis as any).chrome;
+    const afterSync = () => {
+      if (ch?.storage?.session) {
+        ch.storage.session.get('linkcollector_context_save', (data: { linkcollector_context_save?: { tabId: number; linkUrl?: string | null } }) => {
+          const p = data?.linkcollector_context_save;
+          if (p?.tabId) {
+            ch.storage.session.remove('linkcollector_context_save');
+            runCapture({ tabId: p.tabId, linkUrl: p.linkUrl ?? undefined });
+          } else {
+            runCapture();
+          }
+        });
+      } else {
+        runCapture();
+      }
+    };
+
+    initFromChromeStorage(afterSync);
   }, []);
 
   // Handlers
@@ -217,6 +371,19 @@ const App: React.FC = () => {
     }
   };
 
+  const handleImport = useCallback(
+    async (links: ImportableLink[]) => {
+      const existingUrls = new Set(savedLinks.map((l) => l.url));
+      for (const link of links) {
+        if (existingUrls.has(link.url)) continue;
+        const payload = toSavePayload(link);
+        await saveLink(payload);
+        existingUrls.add(link.url);
+      }
+    },
+    [saveLink, savedLinks]
+  );
+
   // Render based on status
   if (status === AppStatus.SETTINGS) {
     return (
@@ -249,6 +416,7 @@ const App: React.FC = () => {
         onDelete={deleteLink}
         onRefresh={loadLinks}
         onBack={() => setStatus(AppStatus.IDLE)}
+        onImport={handleImport}
       />
     );
   }
@@ -269,6 +437,8 @@ const App: React.FC = () => {
         onNotesChange={setNotes}
         onSave={handleUpdate}
         onBack={() => { setStatus(AppStatus.LIST); setEditingLink(null); }}
+        onReAnalyze={handleReAnalyze}
+        reAnalyzing={reAnalyzing}
       />
     );
   }
@@ -287,7 +457,7 @@ const App: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-24 space-y-4">
             <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">
-              {status === AppStatus.EXTRACTING ? 'Захватываем страницу...' : `${settings.aiProvider === 'google_gemini' ? 'Gemini' : 'Cerebras'} анализирует...`}
+              {status === AppStatus.EXTRACTING ? 'Захватываем страницу...' : `${getAnalyzingModelLabel(settings)} анализирует...`}
             </p>
           </div>
         ) : metadata ? (
@@ -312,6 +482,18 @@ const App: React.FC = () => {
               </div>
             )}
 
+            {error && (
+              <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 mb-2 animate-in fade-in slide-in-from-top-2">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs font-bold">Проблема с ИИ-анализом</p>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    {error}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <LinkForm
               metadata={metadata}
               category={category}
@@ -322,6 +504,8 @@ const App: React.FC = () => {
               onAddCategory={handleAddCategory}
               onTagsChange={setTags}
               onNotesChange={setNotes}
+              onReAnalyze={handleReAnalyze}
+              reAnalyzing={reAnalyzing}
             />
           </>
         ) : (
@@ -330,7 +514,7 @@ const App: React.FC = () => {
             <p className="text-sm font-bold text-center px-10">
               {error || "Не удалось захватить данные страницы"}
             </p>
-            <Button onClick={handleCapture} className="mt-5" size="sm">
+            <Button onClick={() => handleCapture()} className="mt-5" size="sm">
               Обновить
             </Button>
           </div>

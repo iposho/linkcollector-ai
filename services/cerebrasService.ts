@@ -1,3 +1,6 @@
+/**
+ * @deprecated Скрыт из UI, заменён на OpenRouter. Оставлен для обратной совместимости — не удалять.
+ */
 import { PageMetadata } from "../types";
 
 const CEREBRAS_API_URL = "https://api.cerebras.ai/v1/chat/completions";
@@ -36,7 +39,7 @@ Description: ${metadata.description}
             content: prompt
           }
         ],
-        max_tokens: 512,
+        max_tokens: 2048,
         temperature: 0.7,
         response_format: { type: 'json_object' }
       })

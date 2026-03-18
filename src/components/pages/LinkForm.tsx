@@ -1,7 +1,7 @@
 import React from 'react';
-import { Search } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 import { PageMetadata } from '../../../types';
-import { TagInput, CategorySelector } from '../common';
+import { TagInput, CategorySelector, Button } from '../common';
 import { PreviewCard } from './PreviewCard';
 
 interface LinkFormProps {
@@ -14,6 +14,8 @@ interface LinkFormProps {
     onAddCategory: (category: string) => void;
     onTagsChange: (tags: string[]) => void;
     onNotesChange: (notes: string) => void;
+    onReAnalyze?: () => void;
+    reAnalyzing?: boolean;
 }
 
 export const LinkForm: React.FC<LinkFormProps> = ({
@@ -25,11 +27,38 @@ export const LinkForm: React.FC<LinkFormProps> = ({
     onCategoryChange,
     onAddCategory,
     onTagsChange,
-    onNotesChange
+    onNotesChange,
+    onReAnalyze,
+    reAnalyzing = false
 }) => {
     return (
         <>
             <PreviewCard metadata={metadata} />
+
+            {onReAnalyze && (
+                <section className="mt-2 mb-1 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="text-left">
+                            <p className="text-xs font-bold text-slate-800">Анализ содержимого</p>
+                            <p className="text-[11px] text-slate-500">
+                                ИИ помогает подобрать категорию, теги и краткое резюме страницы.
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={onReAnalyze}
+                            disabled={reAnalyzing}
+                            loading={reAnalyzing}
+                            icon={<Sparkles className="w-3.5 h-3.5" />}
+                            className="shrink-0"
+                        >
+                            {reAnalyzing ? 'Анализ...' : 'Повторить'}
+                        </Button>
+                    </div>
+                </section>
+            )}
 
             <div className="space-y-4">
                 <CategorySelector

@@ -2,6 +2,24 @@ import { PageMetadata } from "../../types";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
+/**
+ * Извлекает и парсит JSON из ответа модели (убирает markdown-обёртки и лишний текст).
+ */
+function parseJsonResponse(raw: string): { category?: string; tags?: string[]; summary?: string } {
+    let s = raw.trim();
+    // Убираем обёртку ```json ... ``` или ``` ... ```
+    const codeBlock = /^```(?:json)?\s*([\s\S]*?)\s*```\s*$/im;
+    const match = s.match(codeBlock);
+    if (match) s = match[1].trim();
+    // Ищем первый { и последний } — на случай текста до/после JSON
+    const first = s.indexOf('{');
+    const last = s.lastIndexOf('}');
+    if (first !== -1 && last !== -1 && last > first) {
+        s = s.slice(first, last + 1);
+    }
+    return JSON.parse(s) as { category?: string; tags?: string[]; summary?: string };
+}
+
 export const analyzePageContent = async (
     metadata: PageMetadata,
     apiKey: string,
@@ -42,25 +60,46 @@ Description: ${metadata.description}
                 ],
                 generationConfig: {
                     temperature: 0.7,
-                    maxOutputTokens: 512,
-                    responseMimeType: 'application/json'
+                    maxOutputTokens: 2048,
+                    responseMimeType: 'application/json',
+                    responseJsonSchema: {
+                        type: 'object',
+                        properties: {
+                            category: { type: 'string', description: 'Одна категория из списка' },
+                            tags: { type: 'array', items: { type: 'string' }, description: '3-5 тегов' },
+                            summary: { type: 'string', description: 'Краткое резюме 1-2 предложения' }
+                        },
+                        required: ['category', 'tags', 'summary']
+                    }
                 }
             })
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+            const raw = await response.text();
+            let msg = raw;
+            try {
+                const err = JSON.parse(raw);
+                msg = err.error?.message || err.message || raw || `HTTP ${response.status}`;
+            } catch {
+                msg = raw || `HTTP ${response.status}`;
+            }
+            throw new Error(`Gemini: ${msg}`);
         }
 
         const data = await response.json();
-        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const candidate = data.candidates?.[0];
+        const content = candidate?.content?.parts?.[0]?.text;
 
         if (!content) {
-            throw new Error("Empty response from Gemini API");
+            const blockReason = candidate?.finishReason || data.promptFeedback?.blockReason;
+            if (blockReason) {
+                throw new Error(`Gemini: ответ заблокирован (${blockReason}). Попробуйте другую страницу или модель.`);
+            }
+            throw new Error("Gemini: пустой ответ. Проверьте квоту и ключ API.");
         }
 
-        const parsed = JSON.parse(content);
+        const parsed = parseJsonResponse(content);
 
         return {
             category: parsed.category || "Прочее",
@@ -68,12 +107,9 @@ Description: ${metadata.description}
             summary: parsed.summary || metadata.description || "Без описания"
         };
     } catch (error) {
-        console.error("Gemini Analysis Error:", error);
-        return {
-            category: "Прочее",
-            tags: ["web"],
-            summary: metadata.description || "Без описания"
-        };
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("Gemini Analysis Error:", message);
+        throw new Error(message);
     }
 };
 

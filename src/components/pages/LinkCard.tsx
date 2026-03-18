@@ -24,10 +24,10 @@ export const LinkCard: React.FC<LinkCardProps> = ({ link, onEdit, onDelete }) =>
                         <h3 className="font-bold text-sm text-slate-800 line-clamp-2 flex-1">
                             {link.title}
                         </h3>
-                        <div className="flex gap-1 flex-shrink-0">
+                        <div className="flex gap-1 flex-shrink-0 min-w-[72px] justify-end">
                             <button
                                 onClick={onEdit}
-                                className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors"
+                                className="w-8 h-8 flex items-center justify-center hover:bg-indigo-50 rounded-lg transition-colors"
                                 title="Редактировать"
                                 aria-label="Редактировать ссылку"
                             >
@@ -35,7 +35,7 @@ export const LinkCard: React.FC<LinkCardProps> = ({ link, onEdit, onDelete }) =>
                             </button>
                             <button
                                 onClick={onDelete}
-                                className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                                className="w-8 h-8 flex items-center justify-center hover:bg-red-50 rounded-lg transition-colors"
                                 title="Удалить"
                                 aria-label="Удалить ссылку"
                             >

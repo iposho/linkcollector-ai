@@ -20,7 +20,7 @@ export interface SavedLink {
 }
 
 export type StorageProvider = 'google_sheets' | 'notion';
-export type AiProvider = 'cerebras' | 'google_gemini';
+export type AiProvider = 'cerebras' | 'google_gemini' | 'groq' | 'openrouter' | 'sambanova';
 
 export interface AppSettings {
   storageProvider: StorageProvider;
@@ -34,10 +34,18 @@ export interface AppSettings {
   autoAiAnalysis: boolean;
   aiProvider: AiProvider; // Провайдер ИИ-анализа
   folderName: string;
-  cerebrasApiKey: string; // API ключ для Cerebras AI
-  cerebrasModel?: string; // Модель для Cerebras AI
-  geminiApiKey: string; // API ключ для Google Gemini
-  geminiModel?: string; // Модель для Google Gemini
+  /** @deprecated Скрыт из UI, заменён на OpenRouter. Оставлен для обратной совместимости. */
+  cerebrasApiKey: string;
+  /** @deprecated См. cerebrasApiKey */
+  cerebrasModel?: string;
+  geminiApiKey: string;
+  geminiModel?: string;
+  groqApiKey: string;
+  groqModel?: string;
+  openRouterApiKey: string; // OpenRouter (openrouter.ai), бесплатные модели
+  openRouterModel?: string;
+  sambanovaApiKey: string; // SambaNova Cloud
+  sambanovaModel?: string;
 }
 
 export enum AppStatus {

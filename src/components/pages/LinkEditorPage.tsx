@@ -18,6 +18,8 @@ interface LinkEditorPageProps {
     onNotesChange: (notes: string) => void;
     onSave: () => void;
     onBack: () => void;
+    onReAnalyze?: () => void;
+    reAnalyzing?: boolean;
 }
 
 export const LinkEditorPage: React.FC<LinkEditorPageProps> = ({
@@ -32,7 +34,9 @@ export const LinkEditorPage: React.FC<LinkEditorPageProps> = ({
     onTagsChange,
     onNotesChange,
     onSave,
-    onBack
+    onBack,
+    onReAnalyze,
+    reAnalyzing = false
 }) => {
     return (
         <div className="w-[450px] min-h-[600px] max-h-[600px] bg-white flex flex-col overflow-hidden border border-slate-100">
@@ -52,6 +56,8 @@ export const LinkEditorPage: React.FC<LinkEditorPageProps> = ({
                     onAddCategory={onAddCategory}
                     onTagsChange={onTagsChange}
                     onNotesChange={onNotesChange}
+                    onReAnalyze={onReAnalyze}
+                    reAnalyzing={reAnalyzing}
                 />
             </main>
 

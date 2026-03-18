@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { Trash2, Copy, Check, Info, Database, ShieldCheck, ShieldAlert, BookOpen } from 'lucide-react';
 import { AppSettings, StorageProvider, AiProvider } from '../../../types';
 import { Header, Button, Modal } from '../common';
+import { validateOpenRouterApiKey } from '../../services/openRouterService';
 import { validateCerebrasApiKey } from '../../services/cerebrasService';
 import { validateGeminiApiKey } from '../../services/geminiService';
+import { validateGroqApiKey } from '../../services/groqService';
+import { validateSambaNovaApiKey } from '../../services/sambanovaService';
 import { validateConnection as validateNotionConnection } from '../../services/notionService';
 
 interface SettingsPageProps {
@@ -48,8 +51,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     };
 
     const handleTestConnection = async () => {
-        if (!settings.cerebrasApiKey) {
+        if (settings.aiProvider === 'google_gemini' && !settings.geminiApiKey) {
             setValidationResult({ success: false, message: 'Сначала введите API ключ' });
+            return;
+        }
+        if (settings.aiProvider === 'groq' && !settings.groqApiKey) {
+            setValidationResult({ success: false, message: 'Сначала введите API ключ' });
+            return;
+        }
+        if (settings.aiProvider === 'openrouter' && !settings.openRouterApiKey) {
+            setValidationResult({ success: false, message: 'Сначала введите API ключ' });
+            return;
+        }
+        if (settings.aiProvider === 'sambanova' && !settings.sambanovaApiKey) {
+            setValidationResult({ success: false, message: 'Сначала введите API ключ' });
+            return;
+        }
+        if (settings.aiProvider === 'cerebras' && !settings.openRouterApiKey && !settings.cerebrasApiKey) {
+            setValidationResult({ success: false, message: 'Сначала введите API ключ (OpenRouter или Cerebras)' });
             return;
         }
 
@@ -57,7 +76,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         setValidationResult(null);
 
         try {
-            const result = await validateCerebrasApiKey(settings.cerebrasApiKey, settings.cerebrasModel);
+            let result: { success: boolean; error?: string };
+            if (settings.aiProvider === 'openrouter') {
+                result = await validateOpenRouterApiKey(settings.openRouterApiKey, settings.openRouterModel);
+            } else if (settings.aiProvider === 'sambanova') {
+                result = await validateSambaNovaApiKey(settings.sambanovaApiKey, settings.sambanovaModel);
+            } else if (settings.aiProvider === 'cerebras') {
+                if (settings.cerebrasApiKey) {
+                    result = await validateCerebrasApiKey(settings.cerebrasApiKey, settings.cerebrasModel);
+                } else {
+                    result = await validateOpenRouterApiKey(settings.openRouterApiKey, settings.openRouterModel);
+                }
+            } else if (settings.aiProvider === 'google_gemini') {
+                result = await validateGeminiApiKey(settings.geminiApiKey, settings.geminiModel);
+            } else {
+                result = await validateGroqApiKey(settings.groqApiKey, settings.groqModel);
+            }
             if (result.success) {
                 setValidationResult({ success: true, message: 'Соединение установлено!' });
             } else {
@@ -291,64 +325,102 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                 Провайдер ИИ
                             </label>
-                            <div className="flex bg-slate-100 rounded-xl p-1">
+                            <div className="flex flex-wrap gap-1 bg-slate-100 rounded-xl p-1">
                                 <button
                                     onClick={() => {
-                                        onSettingsChange({ ...settings, aiProvider: 'cerebras' });
+                                        onSettingsChange({ ...settings, aiProvider: 'openrouter' });
                                         setValidationResult(null);
                                     }}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${settings.aiProvider === 'cerebras'
+                                    className={`flex-1 min-w-0 flex items-center justify-center gap-2 py-2.5 px-2 rounded-lg text-xs font-bold transition-all ${(settings.aiProvider === 'openrouter' || settings.aiProvider === 'cerebras')
                                         ? 'bg-white text-indigo-700 shadow-sm'
                                         : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                 >
-                                    Cerebras
+                                    OpenRouter
                                 </button>
                                 <button
                                     onClick={() => {
                                         onSettingsChange({ ...settings, aiProvider: 'google_gemini' });
                                         setValidationResult(null);
                                     }}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${settings.aiProvider === 'google_gemini'
+                                    className={`flex-1 min-w-0 flex items-center justify-center gap-2 py-2.5 px-2 rounded-lg text-xs font-bold transition-all ${settings.aiProvider === 'google_gemini'
                                         ? 'bg-white text-indigo-700 shadow-sm'
                                         : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                 >
-                                    Google Gemini
+                                    Gemini
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onSettingsChange({ ...settings, aiProvider: 'groq' });
+                                        setValidationResult(null);
+                                    }}
+                                    className={`flex-1 min-w-0 flex items-center justify-center gap-2 py-2.5 px-2 rounded-lg text-xs font-bold transition-all ${settings.aiProvider === 'groq'
+                                        ? 'bg-white text-indigo-700 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    Groq
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onSettingsChange({ ...settings, aiProvider: 'sambanova' });
+                                        setValidationResult(null);
+                                    }}
+                                    className={`flex-1 min-w-0 flex items-center justify-center gap-2 py-2.5 px-2 rounded-lg text-xs font-bold transition-all ${settings.aiProvider === 'sambanova'
+                                        ? 'bg-white text-indigo-700 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    SambaNova
                                 </button>
                             </div>
                         </div>
 
-                        {/* Cerebras Settings */}
-                        {settings.aiProvider === 'cerebras' && (
+                        {/* OpenRouter Settings (бесплатные модели) */}
+                        {(settings.aiProvider === 'openrouter' || settings.aiProvider === 'cerebras') && (
                             <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                        Cerebras API Key
+                                        OpenRouter API Key
                                     </label>
                                     <input
                                         type="password"
-                                        value={settings.cerebrasApiKey || ''}
+                                        value={settings.openRouterApiKey || ''}
                                         onChange={(e) => {
-                                            onSettingsChange({ ...settings, cerebrasApiKey: e.target.value });
+                                            onSettingsChange({ ...settings, openRouterApiKey: e.target.value });
                                             setValidationResult(null);
                                         }}
-                                        placeholder="csk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        placeholder="sk-or-v1-..."
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                                     />
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                        Модель Cerebras
+                                        Модель (бесплатные)
                                     </label>
                                     <select
-                                        value={settings.cerebrasModel || 'llama3.1-8b'}
-                                        onChange={(e) => onSettingsChange({ ...settings, cerebrasModel: e.target.value })}
+                                        value={settings.openRouterModel || 'stepfun/step-3.5-flash:free'}
+                                        onChange={(e) => onSettingsChange({ ...settings, openRouterModel: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
-                                        <option value="llama3.1-8b">llama3.1-8b</option>
-                                        <option value="gpt-oss-120b">gpt-oss-120b</option>
+                                        <option value="stepfun/step-3.5-flash:free">StepFun: Step 3.5 Flash</option>
+                                        <option value="openrouter/hunter-alpha">OpenRouter: Hunter Alpha</option>
+                                        <option value="arcee-ai/trinity-large-preview:free">Arcee AI: Trinity Large Preview</option>
+                                        <option value="nvidia/nemotron-3-super-120b-a12b:free">NVIDIA: Nemotron 3 Super</option>
+                                        <option value="openrouter/healer-alpha">OpenRouter: Healer Alpha</option>
+                                        <option value="z-ai/glm-4.5-air:free">Z.ai: GLM 4.5 Air</option>
+                                        <option value="nvidia/nemotron-3-nano-30b-a3b:free">NVIDIA: Nemotron 3 Nano 30B A3B</option>
+                                        <option value="arcee-ai/trinity-mini:free">Arcee AI: Trinity Mini</option>
+                                        <option value="nvidia/nemotron-nano-12b-v2-vl:free">NVIDIA: Nemotron Nano 12B 2 VL</option>
+                                        <option value="nvidia/nemotron-nano-9b-v2:free">NVIDIA: Nemotron Nano 9B V2</option>
+                                        <option value="qwen/qwen3-coder:free">Qwen: Qwen3 Coder 480B A35B</option>
+                                        <option value="qwen/qwen3-next-80b-a3b-instruct:free">Qwen: Qwen3 Next 80B A3B</option>
+                                        <option value="meta-llama/llama-3.3-70b-instruct:free">Meta: Llama 3.3 70B Instruct</option>
+                                        <option value="openai/gpt-oss-120b:free">OpenAI: gpt-oss-120b</option>
+                                        <option value="liquid/lfm-2.5-1.2b-thinking:free">LiquidAI: LFM2.5-1.2B-Thinking</option>
+                                        <option value="mistralai/mistral-small-3.1-24b-instruct:free">Mistral: Mistral Small 3.1 24B</option>
                                     </select>
                                 </div>
 
@@ -377,8 +449,75 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 </div>
 
                                 <p className="text-[10px] text-slate-400 italic">
-                                    Получить ключ: <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">cloud.cerebras.ai</a> (бесплатно)
+                                    Ключ: <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">openrouter.ai</a> — бесплатные модели с лимитом 20 req/мин, 200/день
                                 </p>
+                            </div>
+                        )}
+
+                        {/* SambaNova Settings */}
+                        {settings.aiProvider === 'sambanova' && (
+                            <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        SambaNova API Key
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={settings.sambanovaApiKey || ''}
+                                        onChange={(e) => {
+                                            onSettingsChange({ ...settings, sambanovaApiKey: e.target.value });
+                                            setValidationResult(null);
+                                        }}
+                                        placeholder="sn-api-key-..."
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Модель
+                                    </label>
+                                    <select
+                                        value={settings.sambanovaModel || 'DeepSeek-R1-0528'}
+                                        onChange={(e) => onSettingsChange({ ...settings, sambanovaModel: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="DeepSeek-R1-0528">DeepSeek-R1-0528 (RPM 20 / TPD 200k)</option>
+                                        <option value="DeepSeek-R1-Distill-Llama-70B">DeepSeek-R1-Distill-Llama-70B</option>
+                                        <option value="DeepSeek-V3-0324">DeepSeek-V3-0324</option>
+                                        <option value="Deepseek-V3.1">Deepseek-V3.1</option>
+                                        <option value="Meta-Llama-3.3-70B-Instruct">Meta-Llama-3.3-70B-Instruct</option>
+                                        <option value="Meta-Llama-3.1-8B-Instruct">Meta-Llama-3.1-8B-Instruct</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleTestConnection}
+                                        loading={isValidating}
+                                        className="text-[11px] h-9"
+                                        icon={!isValidating && <ShieldCheck className="w-3.5 h-3.5" />}
+                                    >
+                                        Проверить соединение
+                                    </Button>
+                                    {validationResult && (
+                                        <div className="flex items-center gap-1 text-xs">
+                                            {validationResult.success ? (
+                                                <span className="flex items-center gap-1 text-emerald-600">
+                                                    <Check className="w-3 h-3" />
+                                                    {validationResult.message}
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1 text-rose-600">
+                                                    <ShieldAlert className="w-3 h-3" />
+                                                    {validationResult.message}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -411,7 +550,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
                                         <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+                                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                                     </select>
                                 </div>
 
@@ -463,6 +603,83 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 </p>
                             </div>
                         )}
+
+                        {/* Groq Settings */}
+                        {settings.aiProvider === 'groq' && (
+                            <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Groq API Key
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={settings.groqApiKey || ''}
+                                        onChange={(e) => {
+                                            onSettingsChange({ ...settings, groqApiKey: e.target.value });
+                                            setValidationResult(null);
+                                        }}
+                                        placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Модель Groq
+                                    </label>
+                                    <select
+                                        value={settings.groqModel || 'llama-3.3-70b-versatile'}
+                                        onChange={(e) => onSettingsChange({ ...settings, groqModel: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
+                                        <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant</option>
+                                        <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B</option>
+                                        <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+                                        <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
+                                        <option value="openai/gpt-oss-safeguard-20b">GPT-OSS Safeguard 20B</option>
+                                        <option value="qwen/qwen3-32b">Qwen3 32B</option>
+                                        <option value="moonshotai/kimi-k2-instruct">Kimi K2</option>
+                                        <option value="moonshotai/kimi-k2-instruct-0905">Kimi K2 (0905)</option>
+                                        <option value="groq/compound">Groq Compound</option>
+                                        <option value="groq/compound-mini">Groq Compound Mini</option>
+                                        <option value="allam-2-7b">Allam 2 7B</option>
+                                        <option value="meta-llama/llama-prompt-guard-2-86m">Llama Prompt Guard 86M</option>
+                                        <option value="meta-llama/llama-prompt-guard-2-22m">Llama Prompt Guard 22M</option>
+                                        <option value="canopylabs/orpheus-v1-english">Orpheus v1 English</option>
+                                        <option value="canopylabs/orpheus-arabic-saudi">Orpheus Arabic Saudi</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleTestConnection}
+                                        loading={isValidating}
+                                        className="text-[11px] h-9"
+                                        icon={!isValidating && <ShieldCheck className="w-3.5 h-3.5" />}
+                                    >
+                                        Проверить соединение
+                                    </Button>
+
+                                    {validationResult && (
+                                        <div className={`flex items-center gap-1.5 text-[11px] font-medium animate-in fade-in slide-in-from-left-2 ${validationResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                            {validationResult.success ? (
+                                                <ShieldCheck className="w-3.5 h-3.5" />
+                                            ) : (
+                                                <ShieldAlert className="w-3.5 h-3.5" />
+                                            )}
+                                            <span className="truncate max-w-[150px]">{validationResult.message}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p className="text-[10px] text-slate-400 italic">
+                                    Получить ключ: <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">console.groq.com</a> (бесплатный лимит)
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -471,7 +688,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">
                     <div className="mb-3">
                         <span className="text-sm font-bold text-red-800">Очистка кэша</span>
-                        <p className="text-[11px] text-red-600">Удалить все сохраненные данные</p>
+                        <p className="text-[11px] text-red-600">
+                            Удалит все сохранённые ссылки, категории и настройки (включая API-ключи) из локального хранилища.
+                        </p>
                     </div>
                     <Button
                         variant="danger"

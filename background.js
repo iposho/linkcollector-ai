@@ -1,70 +1,98 @@
 // Background script для расширения LinkCollector AI
-// Popup открывается автоматически через default_popup в manifest.json
+// Контекстное меню: сохраняем tabId/linkUrl в session и открываем popup — форма откроется с этой страницей/ссылкой.
+
+const CONTEXT_SAVE_KEY = 'linkcollector_context_save';
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'linkcollector-save-page',
+      title: 'Сохранить страницу в LinkCollector',
+      contexts: ['page'],
+    });
+    chrome.contextMenus.create({
+      id: 'linkcollector-save-link',
+      title: 'Сохранить ссылку в LinkCollector',
+      contexts: ['link'],
+    });
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (!tab?.id) return;
+  if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://'))) {
+    return;
+  }
+  var payload = { tabId: tab.id, linkUrl: info.menuItemId === 'linkcollector-save-link' ? (info.linkUrl || null) : null };
+  chrome.storage.session.set({ [CONTEXT_SAVE_KEY]: payload }, function () {
+    chrome.action.openPopup();
+  });
+});
 
 // Обработчик сообщений от popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Background: получено сообщение', request);
   
   if (request.action === 'captureScreenshot') {
-    console.log('Background: начинаем создание скриншота...');
-    
-    // Делаем скриншот активной вкладки
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      console.log('Background: найдено вкладок в текущем окне:', tabs.length);
-      
-      if (tabs.length === 0) {
-        // Если нет активной вкладки в текущем окне, ищем в других окнах
-        console.log('Background: ищем активную вкладку во всех окнах...');
-        chrome.tabs.query({ active: true }, (allTabs) => {
-          console.log('Background: найдено активных вкладок:', allTabs.length);
-          
-          if (allTabs.length === 0) {
-            console.error('Background: не найдено активных вкладок');
-            sendResponse({ success: false, error: 'No active tab found' });
+    var tabId = request.tabId;
+    function doCaptureVisible(winId) {
+      chrome.tabs.captureVisibleTab(winId, { format: 'png', quality: 80 }, function (screenshotUrl) {
+        if (chrome.runtime.lastError) {
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+        } else if (screenshotUrl) {
+          sendResponse({ success: true, imageUrl: screenshotUrl });
+        } else {
+          sendResponse({ success: false, error: 'Screenshot returned empty' });
+        }
+      });
+    }
+    function runCapture(targetTabId, winId) {
+      if (winId != null) {
+        if (targetTabId != null) {
+          chrome.tabs.update(targetTabId, { active: true }, function () {
+            if (chrome.runtime.lastError) {
+              sendResponse({ success: false, error: chrome.runtime.lastError.message });
+              return;
+            }
+            doCaptureVisible(winId);
+          });
+        } else {
+          doCaptureVisible(winId);
+        }
+      } else {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+          if (tabs.length > 0) {
+            chrome.windows.getCurrent(function (w) {
+              runCapture(tabs[0].id, w && w.id);
+            });
             return;
           }
-          captureTabScreenshot(allTabs[0].id, sendResponse);
+          chrome.tabs.query({ active: true }, function (all) {
+            if (all.length === 0) {
+              sendResponse({ success: false, error: 'No active tab found' });
+              return;
+            }
+            chrome.windows.getCurrent(function (w) {
+              runCapture(all[0].id, w && w.id);
+            });
+          });
         });
-      } else {
-        console.log('Background: используем вкладку:', tabs[0].id, tabs[0].url);
-        captureTabScreenshot(tabs[0].id, sendResponse);
       }
-    });
-    return true; // Указываем, что ответ будет асинхронным
+    }
+    if (tabId) {
+      chrome.tabs.get(tabId, function (tab) {
+        if (chrome.runtime.lastError || !tab) {
+          chrome.windows.getCurrent(function (w) { runCapture(null, w && w.id); });
+          return;
+        }
+        runCapture(tabId, tab.windowId);
+      });
+    } else {
+      chrome.windows.getCurrent(function (w) { runCapture(null, w && w.id); });
+    }
+    return true;
   }
   
   return false;
 });
 
-// Функция для создания скриншота вкладки
-function captureTabScreenshot(tabId, sendResponse) {
-  console.log('Background: captureTabScreenshot вызвана для вкладки:', tabId);
-  
-  // В Manifest V3 используем captureVisibleTab для активной вкладки
-  chrome.windows.getCurrent((currentWindow) => {
-    if (chrome.runtime.lastError) {
-      console.error('Background: ошибка getCurrent:', chrome.runtime.lastError);
-      sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      return;
-    }
-    
-    console.log('Background: текущее окно ID:', currentWindow.id);
-    console.log('Background: вызов captureVisibleTab...');
-    
-    chrome.tabs.captureVisibleTab(currentWindow.id, {
-      format: 'png',
-      quality: 80
-    }, (screenshotUrl) => {
-      if (chrome.runtime.lastError) {
-        console.error('Background: ошибка при создании скриншота:', chrome.runtime.lastError);
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      } else if (screenshotUrl) {
-        console.log('Background: скриншот успешно создан, длина:', screenshotUrl.length);
-        sendResponse({ success: true, imageUrl: screenshotUrl });
-      } else {
-        console.error('Background: скриншот вернул пустое значение');
-        sendResponse({ success: false, error: 'Screenshot returned empty' });
-      }
-    });
-  });
-}

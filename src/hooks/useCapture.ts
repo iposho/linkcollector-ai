@@ -4,31 +4,78 @@ import { getPlaceholderImage } from '../utils/imageUtils';
 
 declare const chrome: any;
 
+export interface CaptureOptions {
+    tabId?: number;
+    linkUrl?: string | null;
+}
+
 export const useCapture = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const captureTab = useCallback(async (): Promise<PageMetadata | null> => {
+    const captureTab = useCallback(async (options?: CaptureOptions): Promise<PageMetadata | null> => {
         setLoading(true);
         setError(null);
 
         try {
             if (typeof chrome !== 'undefined' && chrome.tabs) {
-                let tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-
-                if (tabs.length === 0) {
-                    tabs = await chrome.tabs.query({ active: true });
+                let tab: any;
+                if (options?.tabId) {
+                    try {
+                        tab = await chrome.tabs.get(options.tabId);
+                    } catch {
+                        tab = null;
+                    }
                 }
-
-                if (tabs.length === 0) {
-                    tabs = await chrome.tabs.query({});
-                    tabs.sort((a: any, b: any) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+                if (!tab) {
+                    let tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                    if (tabs.length === 0) tabs = await chrome.tabs.query({ active: true });
+                    if (tabs.length === 0) {
+                        tabs = await chrome.tabs.query({});
+                        tabs.sort((a: any, b: any) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+                    }
+                    tab = tabs[0];
                 }
-
-                const tab = tabs[0];
 
                 if (!tab || !tab.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('chrome-extension://')) {
                     throw new Error("Невозможно извлечь данные с этой страницы");
+                }
+
+                const linkUrl = options?.linkUrl || null;
+
+                if (linkUrl) {
+                    const results = await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        func: (href: string) => {
+                            const a = document.querySelector('a[href="' + href + '"]') || document.querySelector('a[href="' + href + '/"]');
+                            const text = (a?.textContent?.trim()) ? a.textContent.trim().slice(0, 500) : null;
+                            return { linkUrl: href, linkText: text };
+                        },
+                        args: [linkUrl],
+                    });
+                    const r = results?.[0]?.result;
+                    const title = (r?.linkText) || linkUrl;
+                    try {
+                        const u = new URL(linkUrl);
+                        const favicon = `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=128`;
+                        setLoading(false);
+                        return {
+                            url: linkUrl,
+                            title,
+                            description: '',
+                            image: getPlaceholderImage(),
+                            favicon,
+                        };
+                    } catch {
+                        setLoading(false);
+                        return {
+                            url: linkUrl,
+                            title,
+                            description: '',
+                            image: getPlaceholderImage(),
+                            favicon: 'https://www.google.com/s2/favicons?sz=128',
+                        };
+                    }
                 }
 
                 const results = await chrome.scripting.executeScript({
@@ -72,7 +119,7 @@ export const useCapture = () => {
                         const response = await Promise.race([
                             new Promise<any>((resolve, reject) => {
                                 chrome.runtime.sendMessage(
-                                    { action: 'captureScreenshot' },
+                                    { action: 'captureScreenshot', tabId: tab.id },
                                     (response: any) => {
                                         if (chrome.runtime.lastError) {
                                             reject(new Error(chrome.runtime.lastError.message));
