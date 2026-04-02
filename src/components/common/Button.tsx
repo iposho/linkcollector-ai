@@ -18,8 +18,9 @@ const variantStyles = {
 
 const sizeStyles = {
     sm: 'px-3 py-1.5 text-xs rounded-lg',
-    md: 'px-4 py-3 text-sm rounded-xl',
-    lg: 'px-6 py-4 text-sm rounded-2xl'
+    md: 'px-4 py-2.5 text-sm rounded-xl',
+    // Попап/виджет: держим комфортные 44–48px, без “батона”
+    lg: 'px-5 py-3 text-sm rounded-2xl'
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -36,7 +37,7 @@ export const Button: React.FC<ButtonProps> = ({
         <button
             className={`
         flex items-center justify-center gap-2.5
-        font-bold transition-all active:scale-95
+        font-semibold transition-all active:scale-[0.98]
         disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
         ${variantStyles[variant]}
         ${sizeStyles[size]}

@@ -98,6 +98,7 @@ export const useLinks = ({ scriptUrl, storageProvider, notionToken, notionDataba
         category: string;
         tags: string[];
         notes: string;
+        date?: string;
     }) => {
         if (storageProvider === 'notion') {
             if (!notionToken || !notionDatabaseId) {
@@ -133,7 +134,7 @@ export const useLinks = ({ scriptUrl, storageProvider, notionToken, notionDataba
                 action,
                 ...linkData,
                 image: imageBase64,
-                timestamp: new Date().toISOString()
+                timestamp: linkData.date || new Date().toISOString()
             })
         });
 

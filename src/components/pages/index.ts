@@ -6,3 +6,4 @@ export { LinkCard } from './LinkCard';
 export { LinkCardSkeleton, LinkListSkeleton } from './LinkCardSkeleton';
 export { LinkListPage } from './LinkListPage';
 export { LinkEditorPage } from './LinkEditorPage';
+export { HelpPage } from './HelpPage';

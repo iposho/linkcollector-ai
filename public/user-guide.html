@@ -1,0 +1,260 @@
+<!--
+  ВНИМАНИЕ: эту страницу легко “развести” с Markdown-гайдом.
+  Содержимое частично дублирует `docs/USER_GUIDE_RU.md`.
+  Если правите инструкции — синхронизируйте изменения в обоих файлах.
+-->
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LinkCollector AI — руководство пользователя</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --card: rgba(255, 255, 255, 0.06);
+        --card2: rgba(255, 255, 255, 0.08);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.7);
+        --muted2: rgba(255, 255, 255, 0.55);
+        --line: rgba(255, 255, 255, 0.14);
+        --accent: #7c3aed;
+        --accent2: #22c55e;
+        --warn: #f59e0b;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        color: var(--text);
+        background:
+          radial-gradient(900px 500px at 20% 10%, rgba(124, 58, 237, 0.35), transparent 60%),
+          radial-gradient(700px 450px at 80% 20%, rgba(34, 197, 94, 0.22), transparent 55%),
+          radial-gradient(900px 700px at 50% 100%, rgba(245, 158, 11, 0.14), transparent 60%),
+          var(--bg);
+      }
+
+      a { color: inherit; }
+      .wrap { max-width: 980px; margin: 0 auto; padding: 40px 18px 60px; }
+
+      header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 18px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+        box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+      }
+      h1 {
+        font-size: 22px;
+        line-height: 1.15;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+      .sub {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.05);
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .chip b { color: var(--text); font-weight: 800; }
+
+      .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+      .btn {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.06);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-weight: 800;
+        font-size: 12px;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .btn.primary { border-color: rgba(124,58,237,0.55); background: rgba(124,58,237,0.22); }
+      .btn:hover { filter: brightness(1.08); }
+
+      main { margin-top: 16px; }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.3fr 0.7fr;
+        gap: 14px;
+      }
+      @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: rgba(255,255,255,0.05);
+        padding: 16px 16px;
+      }
+      h2 { margin: 0 0 10px 0; font-size: 15px; letter-spacing: -0.01em; }
+      h3 { margin: 16px 0 8px 0; font-size: 13px; color: rgba(255,255,255,0.9); }
+      p, li { color: var(--muted); font-size: 13px; line-height: 1.65; }
+      ul, ol { margin: 8px 0 0 0; padding-left: 18px; }
+      hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        color: rgba(255,255,255,0.9);
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 2px 6px;
+        border-radius: 8px;
+      }
+      .note {
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        background: rgba(245, 158, 11, 0.10);
+        padding: 12px 12px;
+        border-radius: 16px;
+        color: rgba(255,255,255,0.86);
+      }
+      .note b { color: rgba(255,255,255,0.95); }
+      .toc a { color: var(--muted); text-decoration: none; }
+      .toc a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+      .muted { color: var(--muted2); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>LinkCollector AI — руководство пользователя</h1>
+          <div class="sub">
+            Пошаговая инструкция: установка, настройка Google Sheets или Notion, сохранение ссылок, ИИ‑анализ, импорт/экспорт и диагностика.
+          </div>
+          <div class="chips">
+            <div class="chip"><b>Хранилище</b> Google Sheets / Notion</div>
+            <div class="chip"><b>ИИ</b> Gemini / Groq / OpenRouter / SambaNova</div>
+            <div class="chip"><b>Данные</b> хранятся локально в Chrome</div>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="#start">Быстрый старт</a>
+          <a class="btn" href="#troubles">Если не работает</a>
+          <button class="btn" type="button" onclick="window.close()">Закрыть вкладку</button>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="card">
+          <h2 id="start">1) Как начать пользоваться (3–5 минут)</h2>
+
+          <h3>Шаг 1. Установите расширение</h3>
+          <p>Если расширение уже установлено — пропустите этот шаг.</p>
+          <ol>
+            <li>Откройте <code>chrome://extensions/</code></li>
+            <li>Включите <b>Режим разработчика</b></li>
+            <li>Нажмите <b>Загрузить распакованное расширение</b></li>
+            <li>Выберите папку расширения (обычно <code>dist</code>, если вам передали готовую сборку)</li>
+          </ol>
+
+          <hr />
+
+          <h3>Шаг 2. Настройте хранилище</h3>
+          <p>Откройте расширение → <b>Настройки</b> (⚙️) → <b>Хранилище ссылок</b>.</p>
+
+          <h3>Вариант A. Google Sheets</h3>
+          <p>Нужен URL веб‑приложения Apps Script, который заканчивается на <code>/exec</code>.</p>
+          <ol>
+            <li>Сделайте копию таблицы по кнопке <b>Шаблон таблицы</b> в справке расширения</li>
+            <li>В таблице откройте <b>Расширения → Apps Script</b></li>
+            <li><b>Deploy → New deployment</b> и выберите <b>Web app</b></li>
+            <li><b>Execute as</b>: <b>Me</b>, <b>Who has access</b>: <b>Anyone</b></li>
+            <li>Скопируйте <b>Web app URL</b> вида <code>https://script.google.com/macros/s/.../exec</code></li>
+            <li>Вставьте URL в настройках расширения в поле <b>Google Apps Script URL</b> и нажмите <b>Сохранить</b></li>
+          </ol>
+          <div class="note">
+            <b>Проверка:</b> откройте “Справка и FAQ” → “Диагностика” → <b>Проверить Script URL</b>.
+          </div>
+
+          <h3>Вариант B. Notion</h3>
+          <ol>
+            <li>Создайте Integration Token на <code>notion.so/my-integrations</code></li>
+            <li>Создайте базу данных в Notion и подключите к ней интеграцию (⋯ → Connections)</li>
+            <li>Скопируйте <b>Database ID</b> (обычно UUID из ссылки на базу)</li>
+            <li>В расширении: Настройки → Notion → вставьте Token и Database ID</li>
+            <li>Нажмите <b>Проверить соединение</b> и затем <b>Сохранить</b></li>
+          </ol>
+
+          <hr />
+
+          <h3>Шаг 3. Сохраните первую ссылку</h3>
+          <ol>
+            <li>Откройте нужную страницу</li>
+            <li>Нажмите иконку расширения</li>
+            <li>Если нужно — нажмите <b>Захватить страницу</b></li>
+            <li>Проверьте категорию, теги и заметки</li>
+            <li>Нажмите <b>Сохранить ссылку</b></li>
+          </ol>
+
+          <h2 id="daily" style="margin-top: 18px;">2) Ежедневное использование</h2>
+          <ul>
+            <li><b>Сохранить вкладку:</b> открыть вкладку → иконка расширения → (при необходимости) “Захватить страницу” → “Сохранить ссылку”.</li>
+            <li><b>Сохранить ссылку через контекстное меню:</b> правой кнопкой по ссылке → “Сохранить…” (если пункт доступен).</li>
+            <li><b>Управление:</b> “Открыть список” → поиск/редактирование/удаление/импорт/экспорт.</li>
+          </ul>
+
+          <h2 id="ai" style="margin-top: 18px;">3) ИИ‑анализ</h2>
+          <p>Включение: Настройки → ИИ‑анализ → “Включить ИИ‑анализ”. Выберите провайдера и вставьте API‑ключ, затем нажмите “Проверить соединение”.</p>
+          <ul>
+            <li>Gemini: <code>aistudio.google.com/apikey</code></li>
+            <li>Groq: <code>console.groq.com/keys</code></li>
+            <li>OpenRouter: <code>openrouter.ai/settings/keys</code></li>
+            <li>SambaNova: <code>cloud.sambanova.ai/apis</code></li>
+          </ul>
+          <p class="muted">ИИ предлагает черновик (категория/теги/резюме) — вы всегда можете исправить вручную.</p>
+        </section>
+
+        <aside class="card toc">
+          <h2>Навигация</h2>
+          <ul>
+            <li><a href="#start">Быстрый старт</a></li>
+            <li><a href="#daily">Ежедневное использование</a></li>
+            <li><a href="#ai">ИИ‑анализ</a></li>
+            <li><a href="#troubles">Проблемы и решения</a></li>
+            <li><a href="#privacy">Приватность</a></li>
+          </ul>
+
+          <hr />
+
+          <h2 id="troubles">Если что-то не работает</h2>
+          <ul>
+            <li><b>“Сохранение недоступно”</b>: не настроен Script URL (Google Sheets) или Token/Database ID (Notion).</li>
+            <li><b>“Не удалось захватить данные страницы”</b>: страницы <code>chrome://…</code> и страницы расширений недоступны.</li>
+            <li><b>Script URL отвечает HTML</b>: чаще всего скопирован не тот URL или доступ не выставлен “Anyone/Все”.</li>
+          </ul>
+
+          <div class="note" style="margin-top: 12px;">
+            <b>Совет:</b> в расширении есть “Справка и FAQ → Диагностика”, где можно проверить Script URL / Notion / ИИ‑ключ.
+          </div>
+
+          <hr />
+
+          <h2 id="privacy">Приватность</h2>
+          <p>Настройки, категории и список ссылок хранятся <b>локально в Chrome</b>. Очистить всё можно через “Настройки → Очистка кэша”.</p>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>
+

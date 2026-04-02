@@ -58,5 +58,6 @@ export enum AppStatus {
   ALREADY_EXISTS = 'ALREADY_EXISTS',
   SETTINGS = 'SETTINGS',
   LIST = 'LIST',
-  EDITING = 'EDITING'
+  EDITING = 'EDITING',
+  HELP = 'HELP'
 }

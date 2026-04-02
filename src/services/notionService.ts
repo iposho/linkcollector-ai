@@ -141,6 +141,7 @@ export const createLink = async (
         category: string;
         tags: string[];
         notes: string;
+        date?: string;
     }
 ): Promise<void> => {
     const response = await fetch(`${NOTION_API_URL}/pages`, {
@@ -150,7 +151,7 @@ export const createLink = async (
             parent: { database_id: databaseId },
             properties: buildNotionProperties({
                 ...linkData,
-                date: new Date().toISOString(),
+                date: linkData.date || new Date().toISOString(),
             }),
         }),
     });

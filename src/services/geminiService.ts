@@ -39,7 +39,7 @@ Title: ${metadata.title}
 Description: ${metadata.description}
 
 Верни JSON объект с полями:
-- category: одна из наиболее подходящих категорий из этого списка: [${categoriesList}]
+- category: выбери наиболее подходящую категорию из списка [${categoriesList}]. Если ни одна не подходит, предложи НОВУЮ категорию (1–3 слова, по-русски), не слишком узкую.
 - tags: массив из 3-5 тегов на русском языке (ключевые слова страницы)
 - summary: краткое резюме страницы на русском языке (1-2 предложения)
 
@@ -65,7 +65,7 @@ Description: ${metadata.description}
                     responseJsonSchema: {
                         type: 'object',
                         properties: {
-                            category: { type: 'string', description: 'Одна категория из списка' },
+                            category: { type: 'string', description: 'Категория из списка; если подходящей нет — новая короткая категория (1–3 слова)' },
                             tags: { type: 'array', items: { type: 'string' }, description: '3-5 тегов' },
                             summary: { type: 'string', description: 'Краткое резюме 1-2 предложения' }
                         },

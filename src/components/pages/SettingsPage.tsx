@@ -15,6 +15,7 @@ interface SettingsPageProps {
     onSave: () => void;
     onClearCache: () => void;
     onBack: () => void;
+    onHelp?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -22,7 +23,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     onSettingsChange,
     onSave,
     onClearCache,
-    onBack
+    onBack,
+    onHelp
 }) => {
     const [copied, setCopied] = useState(false);
     const [showClearModal, setShowClearModal] = useState(false);
@@ -145,11 +147,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             />
 
             <div className="p-6 space-y-5 flex-1 bg-slate-50/30 overflow-y-auto">
-                {/* Storage Provider Selector */}
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Хранилище ссылок
-                    </label>
+                {onHelp && (
+                    <div className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                    <div>
+                        <p className="text-sm font-black text-slate-900">Нужна помощь?</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                            Ответы на частые вопросы и быстрый старт.
+                        </p>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={onHelp}>
+                        Справка
+                    </Button>
+                    </div>
+                )}
+
+                {/* Storage */}
+                <section className="space-y-3">
+                    <div className="flex items-end justify-between gap-3">
+                        <div>
+                            <h2 className="text-sm font-black text-slate-900">Хранилище ссылок</h2>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                Выберите, куда сохранять ссылки и откуда читать список.
+                            </p>
+                        </div>
+                    </div>
                     <div className="flex bg-slate-100 rounded-xl p-1">
                         <button
                             onClick={() => handleProviderChange('google_sheets')}
@@ -172,16 +193,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             Notion
                         </button>
                     </div>
-                </div>
+                </section>
 
                 {/* Google Sheets Settings */}
                 {settings.storageProvider === 'google_sheets' && (
                     <>
                         {/* Script URL Input */}
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Google Apps Script URL
-                            </label>
+                            <div className="flex items-end justify-between gap-3">
+                                <div>
+                                    <h3 className="text-xs font-black text-slate-900">Google Apps Script URL</h3>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                        URL вашего веб‑приложения Apps Script (заканчивается на <span className="font-mono">/exec</span>).
+                                    </p>
+                                </div>
+                            </div>
                             <input
                                 type="text"
                                 value={settings.scriptUrl}
@@ -227,6 +253,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 {/* Notion Settings */}
                 {settings.storageProvider === 'notion' && (
                     <div className="space-y-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                        <div>
+                            <h3 className="text-xs font-black text-slate-900">Интеграция Notion</h3>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                Токен и Database ID сохраняются локально в браузере.
+                            </p>
+                        </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                 Notion Integration Token
@@ -300,26 +332,36 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     </div>
                 )}
 
-                {/* AI Toggle */}
-                <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <div>
-                        <span className="text-sm font-bold text-slate-700">ИИ-анализ</span>
-                        <p className="text-[11px] text-slate-500">Автоматически подбирать теги</p>
+                {/* AI */}
+                <section className="space-y-3">
+                    <div className="flex items-end justify-between gap-3">
+                        <div>
+                            <h2 className="text-sm font-black text-slate-900">ИИ-анализ</h2>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                Автоматически предлагает категорию, теги и резюме страницы.
+                            </p>
+                        </div>
                     </div>
-                    <button
-                        onClick={() => onSettingsChange({ ...settings, autoAiAnalysis: !settings.autoAiAnalysis })}
-                        className={`w-12 h-6 rounded-full relative transition-colors ${settings.autoAiAnalysis ? 'bg-indigo-600' : 'bg-slate-300'}`}
-                        role="switch"
-                        aria-checked={settings.autoAiAnalysis}
-                        aria-label="Включить ИИ-анализ"
-                    >
-                        <div className={`absolute top-1 bg-white w-4 h-4 rounded-full transition-transform ${settings.autoAiAnalysis ? 'left-7' : 'left-1'}`} />
-                    </button>
-                </div>
 
-                {/* AI Provider Settings */}
-                {settings.autoAiAnalysis && (
-                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                        <div>
+                            <span className="text-sm font-bold text-slate-700">Включить ИИ-анализ</span>
+                            <p className="text-[11px] text-slate-500">Ключи для разных провайдеров сохраняются отдельно</p>
+                        </div>
+                        <button
+                            onClick={() => onSettingsChange({ ...settings, autoAiAnalysis: !settings.autoAiAnalysis })}
+                            className={`w-12 h-6 rounded-full relative transition-colors ${settings.autoAiAnalysis ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                            role="switch"
+                            aria-checked={settings.autoAiAnalysis}
+                            aria-label="Включить ИИ-анализ"
+                        >
+                            <div className={`absolute top-1 bg-white w-4 h-4 rounded-full transition-transform ${settings.autoAiAnalysis ? 'left-7' : 'left-1'}`} />
+                        </button>
+                    </div>
+
+                    {/* AI Provider Settings */}
+                    {settings.autoAiAnalysis && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                         {/* AI Provider Selector */}
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -518,6 +560,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                         </div>
                                     )}
                                 </div>
+
+                                <p className="text-[10px] text-slate-400 italic">
+                                    Получить ключ: <a href="https://cloud.sambanova.ai/apis" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">cloud.sambanova.ai</a>
+                                </p>
                             </div>
                         )}
 
@@ -681,7 +727,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             </div>
                         )}
                     </div>
-                )}
+                    )}
+                </section>
 
 
                 {/* Clear Cache */}
@@ -704,7 +751,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
 
             <footer className="p-5 border-t">
-                <Button onClick={onSave} className="w-full" size="lg">
+                <Button onClick={onSave} className="w-full" size="md">
                     Сохранить
                 </Button>
             </footer>

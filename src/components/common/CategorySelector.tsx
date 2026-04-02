@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FolderOpen, Plus, Check } from 'lucide-react';
+import { FolderOpen, Plus, Check, Info } from 'lucide-react';
 
 interface CategorySelectorProps {
     category: string;
@@ -16,6 +16,14 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
 }) => {
     const [showNewInput, setShowNewInput] = useState(false);
     const [newCategory, setNewCategory] = useState('');
+
+    const normalized = (s: string) => s.trim().toLowerCase();
+    const isNewCategory =
+        !!category?.trim() && !categories.some((c) => normalized(c) === normalized(category));
+
+    const optionCategories = isNewCategory
+        ? [category.trim(), ...categories.filter((c) => normalized(c) !== normalized(category))]
+        : categories;
 
     const handleAddCategory = () => {
         if (newCategory.trim()) {
@@ -47,7 +55,12 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                         onChange={(e) => onCategoryChange(e.target.value)}
                         className="w-full px-4 py-3 pr-10 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm appearance-none"
                     >
-                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        {optionCategories.map((c) => (
+                            <option key={c} value={c}>
+                                {c}
+                                {isNewCategory && normalized(c) === normalized(category) ? ' (новая)' : ''}
+                            </option>
+                        ))}
                     </select>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                         <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,6 +77,13 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                     <Plus className="w-4 h-4" />
                 </button>
             </div>
+
+            {isNewCategory && (
+                <p className="flex items-center gap-1.5 px-1 text-[11px] text-slate-500">
+                    <Info className="w-3.5 h-3.5 text-indigo-600" />
+                    Новая категория — добавится после нажатия «Сохранить».
+                </p>
+            )}
 
             {showNewInput && (
                 <div className="relative animate-in fade-in slide-in-from-top-2">

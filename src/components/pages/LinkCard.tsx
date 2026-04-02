@@ -1,21 +1,31 @@
 import React from 'react';
-import { ExternalLink, Settings as SettingsIcon, Trash2 } from 'lucide-react';
+import { Copy as CopyIcon, ExternalLink, Settings as SettingsIcon, Trash2 } from 'lucide-react';
 import { SavedLink } from '../../../types';
 
 interface LinkCardProps {
     link: SavedLink;
     onEdit: () => void;
     onDelete: () => void;
+    onCopy?: (url: string) => void;
 }
 
-export const LinkCard: React.FC<LinkCardProps> = ({ link, onEdit, onDelete }) => {
+export const LinkCard: React.FC<LinkCardProps> = ({ link, onEdit, onDelete, onCopy }) => {
     return (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-indigo-200 transition-shadow transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label={`Открыть: ${link.title}`}
+        >
             <div className="flex items-start gap-3">
                 {link.image && (
                     <img
                         src={link.image}
                         alt={link.title}
+                        width={64}
+                        height={64}
+                        loading="lazy"
                         className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                     />
                 )}
@@ -25,17 +35,39 @@ export const LinkCard: React.FC<LinkCardProps> = ({ link, onEdit, onDelete }) =>
                             {link.title}
                         </h3>
                         <div className="flex gap-1 flex-shrink-0 min-w-[72px] justify-end">
+                            {onCopy && (
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onCopy(link.url);
+                                    }}
+                                    className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                    title="Копировать ссылку"
+                                    aria-label="Копировать ссылку"
+                                >
+                                    <CopyIcon className="w-4 h-4 text-slate-600" />
+                                </button>
+                            )}
                             <button
-                                onClick={onEdit}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-indigo-50 rounded-lg transition-colors"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onEdit();
+                                }}
+                                className="w-8 h-8 flex items-center justify-center hover:bg-indigo-50 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                                 title="Редактировать"
                                 aria-label="Редактировать ссылку"
                             >
                                 <SettingsIcon className="w-4 h-4 text-indigo-600" />
                             </button>
                             <button
-                                onClick={onDelete}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-red-50 rounded-lg transition-colors"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onDelete();
+                                }}
+                                className="w-8 h-8 flex items-center justify-center hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                                 title="Удалить"
                                 aria-label="Удалить ссылку"
                             >
@@ -68,22 +100,18 @@ export const LinkCard: React.FC<LinkCardProps> = ({ link, onEdit, onDelete }) =>
                         )}
                     </div>
 
-                    <div className="mt-2 flex items-center gap-2">
-                        <button
-                            onClick={() => window.open(link.url, '_blank')}
-                            className="text-[10px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"
-                            aria-label="Открыть ссылку в новой вкладке"
-                        >
+                    <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
+                        <div className="flex items-center gap-1 text-indigo-600">
                             <ExternalLink className="w-3 h-3" />
-                            Открыть
-                        </button>
+                            <span>Открыть страницу</span>
+                        </div>
                         <span className="text-[10px] text-slate-400">
                             {new Date(link.date).toLocaleDateString('ru-RU')}
                         </span>
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
     );
 };
 

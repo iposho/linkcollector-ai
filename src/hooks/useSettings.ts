@@ -13,11 +13,17 @@ export const useSettings = () => {
     }, []);
 
     const addCategory = useCallback((categoryName: string) => {
-        if (categoryName.trim() && !categories.includes(categoryName.trim())) {
-            const updated = [...categories, categoryName.trim()];
+        const next = categoryName.trim();
+        if (!next) return null;
+
+        const existing = categories.find((c) => c.trim().toLowerCase() === next.toLowerCase());
+        if (existing) return existing.trim();
+
+        if (!categories.includes(next)) {
+            const updated = [...categories, next];
             setCategories(updated);
             storage.saveCategories(updated);
-            return categoryName.trim();
+            return next;
         }
         return null;
     }, [categories]);
