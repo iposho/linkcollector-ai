@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, Database, X, Info, Trash2 } from "lucide-react";
+import { Loader2, AlertCircle, Database, X, Info, Trash2, RefreshCcw } from "lucide-react";
 import { PageMetadata, AppStatus, SavedLink, AppSettings } from "./types";
 import { analyzePageContent as cerebrasAnalyze } from "./src/services/cerebrasService"; // deprecated: скрыт из UI, оставлен для совместимости
 import { analyzePageContent as openRouterAnalyze } from "./src/services/openRouterService";
@@ -26,6 +26,7 @@ import { useCapture, type CaptureOptions } from "./src/hooks/useCapture";
 // Utils
 import { isUrlSaved, initFromChromeStorage } from "./src/utils/storage";
 import { toSavePayload, type ImportableLink } from "./src/utils/importUtils";
+import { normalizeUrl } from "./src/utils/urlUtils";
 
 /** Короткое имя модели для отображения «Модель X анализирует...» */
 function getAnalyzingModelLabel(settings: AppSettings): string {
@@ -180,6 +181,7 @@ const App: React.FC = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [editingLink, setEditingLink] = useState<SavedLink | null>(null);
+  const [duplicateLink, setDuplicateLink] = useState<SavedLink | null>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [reAnalyzing, setReAnalyzing] = useState(false);
   const [aiUndoSnapshot, setAiUndoSnapshot] = useState<{
@@ -290,7 +292,12 @@ const App: React.FC = () => {
       }
 
       setMetadata(extracted);
-      const isAlreadySaved = isUrlSaved(extracted.url);
+      const duplicate =
+        savedLinks.find(
+          (l) => normalizeUrl(l.url) === normalizeUrl(extracted.url),
+        ) || null;
+      setDuplicateLink(duplicate);
+      const isAlreadySaved = isUrlSaved(extracted.url) || !!duplicate;
 
       if (isAlreadySaved) {
         setStatus(AppStatus.ALREADY_EXISTS);
@@ -311,7 +318,7 @@ const App: React.FC = () => {
 
       setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.IDLE);
     },
-    [captureTab, settings.autoAiAnalysis, applyAiAnalysis],
+    [captureTab, settings.autoAiAnalysis, applyAiAnalysis, savedLinks],
   );
 
   const handleReAnalyze = useCallback(async () => {
@@ -337,6 +344,20 @@ const App: React.FC = () => {
       setReAnalyzing(false);
     }
   }, [metadata, settings, applyAiAnalysis]);
+
+  // Если savedLinks подгрузились после захвата (popup открыт по горячей клавише) —
+  // догоняем определение дубликата по нормализованному URL.
+  useEffect(() => {
+    if (!metadata || duplicateLink) return;
+    const found =
+      savedLinks.find(
+        (l) => normalizeUrl(l.url) === normalizeUrl(metadata.url),
+      ) || null;
+    if (found) {
+      setDuplicateLink(found);
+      if (status === AppStatus.IDLE) setStatus(AppStatus.ALREADY_EXISTS);
+    }
+  }, [savedLinks, metadata, duplicateLink, status]);
 
   const handleUndoAi = useCallback(() => {
     const snap = aiUndoSnapshotRef.current;
@@ -371,13 +392,20 @@ const App: React.FC = () => {
     const afterSync = () => {
       if (ch?.storage?.session) {
         ch.storage.session.get(
-          "linkcollector_context_save",
+          ["linkcollector_context_save", "linkcollector_open_list"],
           (data: {
             linkcollector_context_save?: {
               tabId: number;
               linkUrl?: string | null;
             };
+            linkcollector_open_list?: boolean;
           }) => {
+            if (data?.linkcollector_open_list) {
+              ch.storage.session.remove("linkcollector_open_list");
+              setStatus(AppStatus.LIST);
+              loadLinks();
+              return;
+            }
             const p = data?.linkcollector_context_save;
             if (p?.tabId) {
               ch.storage.session.remove("linkcollector_context_save");
@@ -434,6 +462,7 @@ const App: React.FC = () => {
         tags,
         notes,
       });
+      setDuplicateLink(null);
       setStatus(AppStatus.SUCCESS);
     } catch (err: any) {
       setError(err.message || "Ошибка при сохранении ссылки");
@@ -476,6 +505,7 @@ const App: React.FC = () => {
         notes,
         date: editingLink.date,
       });
+      setDuplicateLink(null);
       setStatus(AppStatus.LIST);
       setEditingLink(null);
       setTimeout(() => loadLinks(), 500);
@@ -514,6 +544,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateExisting = useCallback(() => {
+    if (!duplicateLink || !metadata) return;
+    setEditingLink(duplicateLink);
+    setCategory(duplicateLink.category);
+    setTags(duplicateLink.tags);
+    setNotes(duplicateLink.notes);
+    setStatus(AppStatus.EDITING);
+  }, [duplicateLink, metadata]);
+
   const handleAddCategory = (name: string) => {
     const added = addCategory(name);
     if (added) {
@@ -523,12 +562,15 @@ const App: React.FC = () => {
 
   const handleImport = useCallback(
     async (links: ImportableLink[]) => {
-      const existingUrls = new Set(savedLinks.map((l) => l.url));
+      const existingUrls = new Set(
+        savedLinks.map((l) => normalizeUrl(l.url)),
+      );
       for (const link of links) {
-        if (existingUrls.has(link.url)) continue;
+        const key = normalizeUrl(link.url);
+        if (existingUrls.has(key)) continue;
         const payload = toSavePayload(link);
         await saveLink({ ...payload, date: link.date });
-        existingUrls.add(link.url);
+        existingUrls.add(key);
       }
     },
     [saveLink, savedLinks],
@@ -686,17 +728,29 @@ const App: React.FC = () => {
                         Вы уже сохраняли эту ссылку ранее!
                       </p>
                       <p className="text-[10px] text-indigo-600 mt-1 mb-3">
-                        Вы можете отредактировать и сохранить обновленную
-                        версию, или удалить из сохраненных.
+                        Можно обновить существующую запись (свежие метаданные +
+                        сохранённые теги/заметки), либо удалить её из списка.
                       </p>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => setShowRemoveModal(true)}
-                        icon={<Trash2 className="w-3.5 h-3.5" />}
-                      >
-                        Удалить из сохраненных
-                      </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        {duplicateLink && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleUpdateExisting}
+                            icon={<RefreshCcw className="w-3.5 h-3.5" />}
+                          >
+                            Обновить существующую
+                          </Button>
+                        )}
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => setShowRemoveModal(true)}
+                          icon={<Trash2 className="w-3.5 h-3.5" />}
+                        >
+                          Удалить из сохраненных
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );

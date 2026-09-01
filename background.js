@@ -2,8 +2,52 @@
 // Контекстное меню: сохраняем tabId/linkUrl в session и открываем popup — форма откроется с этой страницей/ссылкой.
 
 const CONTEXT_SAVE_KEY = 'linkcollector_context_save';
+const LIST_OPEN_KEY = 'linkcollector_open_list';
+
+// Бейдж: количество непрочитанных ссылок (savedUrls минус readLinks)
+function updateBadge() {
+  chrome.storage.local.get('linkcollector_data', function (data) {
+    var payload = data && data.linkcollector_data;
+    var urls = (payload && payload.savedUrls) || [];
+    var read = (payload && payload.readLinks) || {};
+    var unread = urls.filter(function (u) { return !read[u]; }).length;
+    if (unread > 0) {
+      chrome.action.setBadgeText({ text: String(unread) });
+      chrome.action.setBadgeBackgroundColor({ color: '#6366f1' });
+    } else {
+      chrome.action.setBadgeText({ text: '' });
+    }
+  });
+}
+
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area === 'local' && changes.linkcollector_data) {
+    updateBadge();
+  }
+});
+
+chrome.runtime.onStartup.addListener(updateBadge);
+
+// Горячие клавиши: Alt+L — сохранить страницу, Alt+Shift+L — открыть список
+chrome.commands.onCommand.addListener(function (command) {
+  if (command === 'save-page') {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      if (!tab || !tab.id) return;
+      if (tab.url && (tab.url.indexOf('chrome://') === 0 || tab.url.indexOf('chrome-extension://') === 0)) return;
+      chrome.storage.session.set({ [CONTEXT_SAVE_KEY]: { tabId: tab.id, linkUrl: null } }, function () {
+        chrome.action.openPopup();
+      });
+    });
+  } else if (command === 'open-list') {
+    chrome.storage.session.set({ [LIST_OPEN_KEY]: true }, function () {
+      chrome.action.openPopup();
+    });
+  }
+});
 
 chrome.runtime.onInstalled.addListener(() => {
+  updateBadge();
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'linkcollector-save-page',

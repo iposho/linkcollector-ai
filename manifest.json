@@ -33,6 +33,20 @@
       "128": "icons/128.png"
     }
   },
+  "commands": {
+    "save-page": {
+      "suggested_key": {
+        "default": "Alt+L"
+      },
+      "description": "Сохранить текущую страницу в LinkCollector"
+    },
+    "open-list": {
+      "suggested_key": {
+        "default": "Alt+Shift+L"
+      },
+      "description": "Открыть список сохранённых ссылок"
+    }
+  },
   "icons": {
     "16": "icons/16.png",
     "48": "icons/48.png",

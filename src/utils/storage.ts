@@ -11,6 +11,7 @@ function syncToChromeStorage() {
                 settings: getSettings(),
                 categories: getCategories(),
                 savedUrls: getSavedUrls(),
+                readLinks: getReadLinks(),
             },
         });
     } catch (_) {}
@@ -57,6 +58,44 @@ export const removeSavedUrl = (url: string): void => {
 
 export const isUrlSaved = (url: string): boolean => {
     return getSavedUrls().includes(url);
+};
+
+// ---------- Трекинг прочитанного (локально, по URL) ----------
+
+export const getReadLinks = (): Record<string, string> => {
+    const raw = localStorage.getItem('read_links');
+    try {
+        return raw ? JSON.parse(raw) : {};
+    } catch {
+        return {};
+    }
+};
+
+/** Отмечает ссылку прочитанной. Возвращает true, если статус изменился. */
+export const markLinkRead = (url: string): boolean => {
+    const read = getReadLinks();
+    if (read[url]) return false;
+    read[url] = new Date().toISOString();
+    localStorage.setItem('read_links', JSON.stringify(read));
+    syncToChromeStorage();
+    return true;
+};
+
+/** Отмечает все переданные ссылки прочитанными. */
+export const markAllRead = (urls: string[]): void => {
+    const read = getReadLinks();
+    const now = new Date().toISOString();
+    let changed = false;
+    for (const u of urls) {
+        if (!read[u]) {
+            read[u] = now;
+            changed = true;
+        }
+    }
+    if (changed) {
+        localStorage.setItem('read_links', JSON.stringify(read));
+        syncToChromeStorage();
+    }
 };
 
 export const getCategories = (): string[] => {
@@ -208,6 +247,7 @@ export const clearAllCache = (): void => {
     localStorage.removeItem('openrouter_model');
     localStorage.removeItem('sambanova_api_key');
     localStorage.removeItem('sambanova_model');
+    localStorage.removeItem('read_links');
     // Иначе при следующем открытии popup initFromChromeStorage подтянет старые данные из chrome.storage.local
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
         chrome.storage.local.remove(CHROME_STORAGE_KEY);

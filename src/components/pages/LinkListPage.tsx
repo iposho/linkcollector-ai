@@ -11,17 +11,25 @@ import {
   FileSpreadsheet,
   Upload,
   MoreHorizontal,
+  BarChart3,
+  Share2,
+  Rows3,
+  Rows2,
 } from "lucide-react";
 import { SavedLink } from "../../../types";
 import { Header, Button, Modal } from "../common";
-import { LinkCard } from "./LinkCard";
+import { LinkCard, type ListDensity } from "./LinkCard";
 import { LinkListSkeleton } from "./LinkCardSkeleton";
 import {
   exportLinksAsJson,
   exportLinksAsMarkdown,
   exportLinksAsCsv,
+  linksToMarkdown,
 } from "../../utils/exportUtils";
 import { parseImportFile, type ImportableLink } from "../../utils/importUtils";
+import { markLinkRead, markAllRead } from "../../utils/storage";
+import { openSharePage } from "../../utils/shareUtils";
+import { StatsModal } from "./StatsModal";
 
 interface LinkListPageProps {
   links: SavedLink[];
@@ -55,6 +63,8 @@ interface RowData {
   onEdit: (link: SavedLink) => void;
   onDeleteClick: (url: string) => void;
   onCopy: (url: string) => void;
+  onOpen: (url: string) => void;
+  density: ListDensity;
 }
 
 // Row component for virtualized list
@@ -65,6 +75,8 @@ const VirtualRow = ({
   onEdit,
   onDeleteClick,
   onCopy,
+  onOpen,
+  density,
 }: RowComponentProps<RowData>) => {
   const link = links[index];
   if (!link) return null;
@@ -75,6 +87,8 @@ const VirtualRow = ({
     >
       <LinkCard
         link={link}
+        density={density}
+        onOpen={onOpen}
         onEdit={() => onEdit(link)}
         onDelete={() => onDeleteClick(link.url)}
         onCopy={onCopy}
@@ -108,6 +122,12 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
   const [importing, setImporting] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [density, setDensity] = useState<ListDensity>(() =>
+    window.localStorage.getItem("linkcollector:list_density:v1") === "compact"
+      ? "compact"
+      : "comfortable",
+  );
   const [toast, setToast] = useState<{
     message: string;
     actionText?: string;
@@ -175,6 +195,11 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
     }, 250);
     return () => window.clearTimeout(t);
   }, [searchQuery, sortBy, selectedCategory]);
+
+  // Persist density
+  useEffect(() => {
+    window.localStorage.setItem("linkcollector:list_density:v1", density);
+  }, [density]);
 
   useEffect(() => {
     if (!exportMenuOpen) return;
@@ -444,9 +469,14 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
     const result = await parseImportFile(file);
     if (result.ok) {
       setImportModal({ isOpen: true, links: result.links, error: null });
-    } else {
-      setImportModal({ isOpen: true, links: null, error: result.error });
+      return;
     }
+    // Без strict-режима TS не сужает false-ветку дискриминанта — используем in-проверку
+    setImportModal({
+      isOpen: true,
+      links: null,
+      error: "error" in result ? result.error : "Ошибка импорта",
+    });
   };
 
   const confirmImport = async () => {
@@ -479,6 +509,9 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
   const useVirtualization =
     filteredAndSortedLinks.length > VIRTUALIZATION_THRESHOLD;
 
+  // Высота карточки зависит от плотности (для виртуализации)
+  const itemHeight = density === "compact" ? 92 : ITEM_HEIGHT;
+
   // Calculate available height for the list (viewport‑relative, учитывая header, панель поиска и footer)
   const listHeight = 386;
 
@@ -498,6 +531,28 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
                 onChange={handleImportFile}
               />
             )}
+            <button
+              onClick={() =>
+                setDensity((d) => (d === "compact" ? "comfortable" : "compact"))
+              }
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              title={density === "compact" ? "Обычная плотность" : "Компактный вид"}
+              aria-label="Переключить плотность списка"
+            >
+              {density === "compact" ? (
+                <Rows2 className="w-5 h-5" />
+              ) : (
+                <Rows3 className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              onClick={() => setStatsOpen(true)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              title="Статистика"
+              aria-label="Статистика"
+            >
+              <BarChart3 className="w-5 h-5" />
+            </button>
             <button
               onClick={onRefresh}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
@@ -583,6 +638,38 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
                     >
                       <FileSpreadsheet className="w-4 h-4 shrink-0" />
                       Скачать CSV
+                    </button>
+                    <div className="my-1 h-px bg-slate-100" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openSharePage(filteredAndSortedLinks);
+                        setExportMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 py-2 px-3 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <Share2 className="w-4 h-4 shrink-0" />
+                      Поделиться подборкой
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setExportMenuOpen(false);
+                        try {
+                          await navigator.clipboard.writeText(
+                            linksToMarkdown(filteredAndSortedLinks),
+                          );
+                          showToast("Markdown скопирован");
+                        } catch {
+                          showToast("Не удалось скопировать", {
+                            durationMs: TOAST_DURATION_MS.error,
+                          });
+                        }
+                      }}
+                      className="w-full flex items-center gap-2 py-2 px-3 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <FileText className="w-4 h-4 shrink-0" />
+                      Скопировать Markdown
                     </button>
                   </div>
                 )}
@@ -761,7 +848,7 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
           // Virtualized list for large datasets (>50 items)
           <List
             rowCount={filteredAndSortedLinks.length}
-            rowHeight={ITEM_HEIGHT}
+            rowHeight={itemHeight}
             defaultHeight={listHeight}
             rowComponent={VirtualRow}
             rowProps={{
@@ -769,6 +856,8 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
               onEdit,
               onDeleteClick: handleDeleteClick,
               onCopy: handleCopy,
+              onOpen: markLinkRead,
+              density,
             }}
             className="scrollbar-thin"
           />
@@ -779,6 +868,8 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
               <LinkCard
                 key={link.url}
                 link={link}
+                density={density}
+                onOpen={markLinkRead}
                 onEdit={() => onEdit(link)}
                 onDelete={() => handleDeleteClick(link.url)}
                 onCopy={handleCopy}
@@ -856,6 +947,16 @@ export const LinkListPage: React.FC<LinkListPageProps> = ({
           </div>
         </div>
       )}
+
+      <StatsModal
+        isOpen={statsOpen}
+        links={links}
+        onClose={() => setStatsOpen(false)}
+        onMarkAllRead={() => {
+          markAllRead(links.map((l) => l.url));
+          showToast("Все ссылки отмечены прочитанными");
+        }}
+      />
     </div>
   );
 };

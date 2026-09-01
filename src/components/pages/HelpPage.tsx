@@ -346,6 +346,16 @@ export const HelpPage: React.FC<HelpPageProps> = ({ onBack, onOpenSettings, sett
                         Некоторые страницы недоступны для расширений (например, <span className="font-mono">chrome://</span> и страницы расширений). Откройте обычный сайт и попробуйте снова.
                     </FAQItem>
 
+                    <FAQItem title="Какие есть горячие клавиши?">
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li><span className="font-mono font-bold">Alt+L</span> — сохранить текущую страницу</li>
+                            <li><span className="font-mono font-bold">Alt+Shift+L</span> — открыть список ссылок</li>
+                        </ul>
+                        <p className="text-[11px] text-slate-500 mt-2">
+                            На иконке расширения показывается число непрочитанных ссылок. Ссылка считается прочитанной после первого открытия из списка.
+                        </p>
+                    </FAQItem>
+
                     <FAQItem title="Импорт/экспорт: что поддерживается?">
                         <div className="space-y-2">
                             <p className="flex items-center gap-2">

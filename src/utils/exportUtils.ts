@@ -43,7 +43,7 @@ export function exportLinksAsCsv(links: SavedLink[], filename?: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 200);
 }
 
-export function exportLinksAsMarkdown(links: SavedLink[], filename?: string): void {
+export function linksToMarkdown(links: SavedLink[]): string {
   const lines: string[] = ['# LinkCollector — экспорт', '', `Дата: ${new Date().toLocaleString('ru')}`, '', '---', ''];
 
   for (const link of links) {
@@ -56,7 +56,11 @@ export function exportLinksAsMarkdown(links: SavedLink[], filename?: string): vo
     lines.push('', '');
   }
 
-  const md = lines.join('\n');
+  return lines.join('\n');
+}
+
+export function exportLinksAsMarkdown(links: SavedLink[], filename?: string): void {
+  const md = linksToMarkdown(links);
   const blob = new Blob([md], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
