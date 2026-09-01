@@ -11,6 +11,38 @@ export function exportLinksAsJson(links: SavedLink[], filename?: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 200);
 }
 
+export function exportLinksAsCsv(links: SavedLink[], filename?: string): void {
+  const escapeCsv = (value: string): string => {
+    const s = value ?? '';
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const header = ['date', 'url', 'title', 'description', 'category', 'tags', 'notes'];
+  const rows = links.map((l) =>
+    [
+      l.date,
+      l.url,
+      l.title,
+      l.description,
+      l.category,
+      (l.tags || []).join('; '),
+      l.notes,
+    ]
+      .map(escapeCsv)
+      .join(','),
+  );
+
+  // BOM нужен, чтобы Excel корректно открыл кириллицу
+  const csv = '\uFEFF' + [header.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || `linkcollector-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 200);
+}
+
 export function exportLinksAsMarkdown(links: SavedLink[], filename?: string): void {
   const lines: string[] = ['# LinkCollector — экспорт', '', `Дата: ${new Date().toLocaleString('ru')}`, '', '---', ''];
 

@@ -354,7 +354,7 @@ export const HelpPage: React.FC<HelpPageProps> = ({ onBack, onOpenSettings, sett
                             </p>
                             <p className="flex items-center gap-2">
                                 <FileDown className="w-4 h-4 text-slate-500" />
-                                Экспорт: <span className="font-bold">JSON</span> и <span className="font-bold">Markdown</span>
+                                Экспорт: <span className="font-bold">JSON / CSV / Markdown</span>
                             </p>
                         </div>
                     </FAQItem>

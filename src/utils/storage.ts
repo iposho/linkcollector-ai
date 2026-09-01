@@ -84,20 +84,56 @@ export const getSettings = () => ({
     geminiApiKey: localStorage.getItem('gemini_api_key') || '',
     geminiModel: localStorage.getItem('gemini_model') || 'gemini-2.5-flash',
     groqApiKey: localStorage.getItem('groq_api_key') || '',
-    groqModel: localStorage.getItem('groq_model') || 'llama-3.3-70b-versatile',
+    groqModel: (() => {
+        const v = localStorage.getItem('groq_model') || 'openai/gpt-oss-120b';
+        const fixes: Record<string, string> = {
+            'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
+            'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
+            'meta-llama/llama-4-scout-17b-16e-instruct': 'openai/gpt-oss-20b',
+            'qwen/qwen3-32b': 'qwen/qwen3.8-27b',
+            'moonshotai/kimi-k2-instruct': 'openai/gpt-oss-120b',
+            'moonshotai/kimi-k2-instruct-0905': 'openai/gpt-oss-120b',
+            'allam-2-7b': 'openai/gpt-oss-20b',
+        };
+        return fixes[v] ?? v;
+    })(),
     openRouterApiKey: localStorage.getItem('openrouter_api_key') || '',
     openRouterModel: (() => {
-        const v = localStorage.getItem('openrouter_model') || 'stepfun/step-3.5-flash:free';
+        const v = localStorage.getItem('openrouter_model') || 'openrouter/free';
         const fixes: Record<string, string> = {
-            'openrouter/free': 'stepfun/step-3.5-flash:free',
-            'liquid/lfm2.5-1.2b-thinking:free': 'liquid/lfm-2.5-1.2b-thinking:free',
-            'qwen/qwen3-coder-480b-a35b-instruct:free': 'qwen/qwen3-coder:free',
-            'nvidia/nemotron-nano-12b-2-vl:free': 'nvidia/nemotron-nano-12b-v2-vl:free',
+            // Снятые с бесплатного доступа модели OpenRouter → роутер free
+            'stepfun/step-3.5-flash:free': 'openrouter/free',
+            'openrouter/hunter-alpha': 'openrouter/free',
+            'arcee-ai/trinity-large-preview:free': 'openrouter/free',
+            'openrouter/healer-alpha': 'openrouter/free',
+            'z-ai/glm-4.5-air:free': 'openrouter/free',
+            'nvidia/nemotron-3-nano-30b-a3b:free': 'openrouter/free',
+            'arcee-ai/trinity-mini:free': 'openrouter/free',
+            'nvidia/nemotron-nano-12b-v2-vl:free': 'openrouter/free',
+            'nvidia/nemotron-nano-9b-v2:free': 'openrouter/free',
+            'qwen/qwen3-coder:free': 'openrouter/free',
+            'qwen/qwen3-coder-480b-a35b-instruct:free': 'openrouter/free',
+            'qwen/qwen3-next-80b-a3b-instruct:free': 'openrouter/free',
+            'meta-llama/llama-3.3-70b-instruct:free': 'openrouter/free',
+            'openai/gpt-oss-120b:free': 'openrouter/free',
+            'liquid/lfm2.5-1.2b-thinking:free': 'openrouter/free',
+            'liquid/lfm-2.5-1.2b-thinking:free': 'openrouter/free',
+            'mistralai/mistral-small-3.1-24b-instruct:free': 'openrouter/free',
         };
         return fixes[v] ?? v;
     })(),
     sambanovaApiKey: localStorage.getItem('sambanova_api_key') || '',
-    sambanovaModel: localStorage.getItem('sambanova_model') || 'DeepSeek-R1-0528'
+    sambanovaModel: (() => {
+        const v = localStorage.getItem('sambanova_model') || 'DeepSeek-V3.1';
+        const fixes: Record<string, string> = {
+            'DeepSeek-R1-0528': 'DeepSeek-V3.1',
+            'DeepSeek-R1-Distill-Llama-70B': 'DeepSeek-V3.1',
+            'DeepSeek-V3-0324': 'DeepSeek-V3.1',
+            'Deepseek-V3.1': 'DeepSeek-V3.1',
+            'Meta-Llama-3.1-8B-Instruct': 'Meta-Llama-3.3-70B-Instruct',
+        };
+        return fixes[v] ?? v;
+    })()
 });
 
 export const saveSettings = (settings: {

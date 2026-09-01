@@ -45,11 +45,11 @@ export const useSettings = () => {
             geminiApiKey: '',
             geminiModel: 'gemini-2.5-flash',
             groqApiKey: '',
-            groqModel: 'llama-3.3-70b-versatile',
+            groqModel: 'openai/gpt-oss-120b',
             openRouterApiKey: '',
-            openRouterModel: 'stepfun/step-3.5-flash:free',
+            openRouterModel: 'openrouter/free',
             sambanovaApiKey: '',
-            sambanovaModel: 'DeepSeek-R1-0528'
+            sambanovaModel: 'DeepSeek-V3.1'
         });
     }, []);
 

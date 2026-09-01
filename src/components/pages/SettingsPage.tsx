@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { Trash2, Copy, Check, Info, Database, ShieldCheck, ShieldAlert, BookOpen } from 'lucide-react';
-import { AppSettings, StorageProvider, AiProvider } from '../../../types';
+import { Trash2, Copy, Check, Info, Database, ShieldCheck, ShieldAlert, BookOpen, FileJson, FileText, FileSpreadsheet } from 'lucide-react';
+import { AppSettings, StorageProvider, AiProvider, SavedLink } from '../../../types';
 import { Header, Button, Modal } from '../common';
 import { validateOpenRouterApiKey } from '../../services/openRouterService';
 import { validateCerebrasApiKey } from '../../services/cerebrasService';
 import { validateGeminiApiKey } from '../../services/geminiService';
 import { validateGroqApiKey } from '../../services/groqService';
 import { validateSambaNovaApiKey } from '../../services/sambanovaService';
+import { exportLinksAsJson, exportLinksAsCsv, exportLinksAsMarkdown } from '../../utils/exportUtils';
 import { validateConnection as validateNotionConnection } from '../../services/notionService';
 
 interface SettingsPageProps {
     settings: AppSettings;
+    links: SavedLink[];
     onSettingsChange: (settings: AppSettings) => void;
     onSave: () => void;
     onClearCache: () => void;
@@ -20,6 +22,7 @@ interface SettingsPageProps {
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
     settings,
+    links,
     onSettingsChange,
     onSave,
     onClearCache,
@@ -443,26 +446,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                         Модель (бесплатные)
                                     </label>
                                     <select
-                                        value={settings.openRouterModel || 'stepfun/step-3.5-flash:free'}
+                                        value={settings.openRouterModel || 'openrouter/free'}
                                         onChange={(e) => onSettingsChange({ ...settings, openRouterModel: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
-                                        <option value="stepfun/step-3.5-flash:free">StepFun: Step 3.5 Flash</option>
-                                        <option value="openrouter/hunter-alpha">OpenRouter: Hunter Alpha</option>
-                                        <option value="arcee-ai/trinity-large-preview:free">Arcee AI: Trinity Large Preview</option>
-                                        <option value="nvidia/nemotron-3-super-120b-a12b:free">NVIDIA: Nemotron 3 Super</option>
-                                        <option value="openrouter/healer-alpha">OpenRouter: Healer Alpha</option>
-                                        <option value="z-ai/glm-4.5-air:free">Z.ai: GLM 4.5 Air</option>
-                                        <option value="nvidia/nemotron-3-nano-30b-a3b:free">NVIDIA: Nemotron 3 Nano 30B A3B</option>
-                                        <option value="arcee-ai/trinity-mini:free">Arcee AI: Trinity Mini</option>
-                                        <option value="nvidia/nemotron-nano-12b-v2-vl:free">NVIDIA: Nemotron Nano 12B 2 VL</option>
-                                        <option value="nvidia/nemotron-nano-9b-v2:free">NVIDIA: Nemotron Nano 9B V2</option>
-                                        <option value="qwen/qwen3-coder:free">Qwen: Qwen3 Coder 480B A35B</option>
-                                        <option value="qwen/qwen3-next-80b-a3b-instruct:free">Qwen: Qwen3 Next 80B A3B</option>
-                                        <option value="meta-llama/llama-3.3-70b-instruct:free">Meta: Llama 3.3 70B Instruct</option>
-                                        <option value="openai/gpt-oss-120b:free">OpenAI: gpt-oss-120b</option>
-                                        <option value="liquid/lfm-2.5-1.2b-thinking:free">LiquidAI: LFM2.5-1.2B-Thinking</option>
-                                        <option value="mistralai/mistral-small-3.1-24b-instruct:free">Mistral: Mistral Small 3.1 24B</option>
+                                        <option value="openrouter/free">Free Models Router (авто)</option>
+                                        <option value="z-ai/glm-5.2:free">GLM 5.2</option>
+                                        <option value="minimax/minimax-m3:free">MiniMax M3</option>
+                                        <option value="google/gemma-4-31b-it:free">Gemma 4 31B</option>
+                                        <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra 550B</option>
+                                        <option value="nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super 120B</option>
+                                        <option value="thinkingmachines/inkling:free">Inkling</option>
+                                        <option value="thinkingmachines/inkling-small:free">Inkling Small</option>
+                                        <option value="liquid/lfm-2.5-2.6b:free">LFM2.5 2.6B</option>
+                                        <option value="nvidia/nemotron-3.5-lightning:free">Nemotron 3.5 Lightning</option>
+                                        <option value="poolside/laguna-s-2.1:free">Laguna S 2.1</option>
+                                        <option value="minimax/minimax-m2.7:free">MiniMax M2.7</option>
+                                        <option value="google/gemma-4-26b-a4b-it:free">Gemma 4 26B A4B</option>
+                                        <option value="cohere/north-mini-code:free">North Mini Code</option>
                                     </select>
                                 </div>
 
@@ -491,7 +492,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 </div>
 
                                 <p className="text-[10px] text-slate-400 italic">
-                                    Ключ: <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">openrouter.ai</a> — бесплатные модели с лимитом 20 req/мин, 200/день
+                                    Ключ: <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">openrouter.ai</a> — только бесплатные модели (:free); лимиты зависят от купленных кредитов: <a href="https://openrouter.ai/settings/limits" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">openrouter.ai/settings/limits</a>
                                 </p>
                             </div>
                         )}
@@ -520,16 +521,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                         Модель
                                     </label>
                                     <select
-                                        value={settings.sambanovaModel || 'DeepSeek-R1-0528'}
+                                        value={settings.sambanovaModel || 'DeepSeek-V3.1'}
                                         onChange={(e) => onSettingsChange({ ...settings, sambanovaModel: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
-                                        <option value="DeepSeek-R1-0528">DeepSeek-R1-0528 (RPM 20 / TPD 200k)</option>
-                                        <option value="DeepSeek-R1-Distill-Llama-70B">DeepSeek-R1-Distill-Llama-70B</option>
-                                        <option value="DeepSeek-V3-0324">DeepSeek-V3-0324</option>
-                                        <option value="Deepseek-V3.1">Deepseek-V3.1</option>
-                                        <option value="Meta-Llama-3.3-70B-Instruct">Meta-Llama-3.3-70B-Instruct</option>
-                                        <option value="Meta-Llama-3.1-8B-Instruct">Meta-Llama-3.1-8B-Instruct</option>
+                                        <option value="DeepSeek-V3.1">DeepSeek-V3.1 (RPM 20 / TPD 200k)</option>
+                                        <option value="Meta-Llama-3.3-70B-Instruct">Meta-Llama-3.3-70B-Instruct (RPM 20 / TPD 200k)</option>
+                                        <option value="gpt-oss-120b">gpt-oss-120b (RPM 20 / TPD 200k)</option>
                                     </select>
                                 </div>
 
@@ -595,6 +593,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                         onChange={(e) => onSettingsChange({ ...settings, geminiModel: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
+                                        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
                                         <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                         <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
                                         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -674,26 +673,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                         Модель Groq
                                     </label>
                                     <select
-                                        value={settings.groqModel || 'llama-3.3-70b-versatile'}
+                                        value={settings.groqModel || 'openai/gpt-oss-120b'}
                                         onChange={(e) => onSettingsChange({ ...settings, groqModel: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
-                                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
-                                        <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant</option>
-                                        <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B</option>
-                                        <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
-                                        <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
-                                        <option value="openai/gpt-oss-safeguard-20b">GPT-OSS Safeguard 20B</option>
-                                        <option value="qwen/qwen3-32b">Qwen3 32B</option>
-                                        <option value="moonshotai/kimi-k2-instruct">Kimi K2</option>
-                                        <option value="moonshotai/kimi-k2-instruct-0905">Kimi K2 (0905)</option>
-                                        <option value="groq/compound">Groq Compound</option>
-                                        <option value="groq/compound-mini">Groq Compound Mini</option>
-                                        <option value="allam-2-7b">Allam 2 7B</option>
-                                        <option value="meta-llama/llama-prompt-guard-2-86m">Llama Prompt Guard 86M</option>
-                                        <option value="meta-llama/llama-prompt-guard-2-22m">Llama Prompt Guard 22M</option>
-                                        <option value="canopylabs/orpheus-v1-english">Orpheus v1 English</option>
-                                        <option value="canopylabs/orpheus-arabic-saudi">Orpheus Arabic Saudi</option>
+                                        <option value="canopylabs/orpheus-v1-english">Orpheus v1 English (RPM 10 · TPM 1.2K)</option>
+                                        <option value="canopylabs/orpheus-arabic-saudi">Orpheus Arabic Saudi (RPM 10 · TPM 1.2K)</option>
+                                        <option value="groq/compound">Groq Compound (RPM 30 · TPM 70K)</option>
+                                        <option value="groq/compound-mini">Groq Compound Mini (RPM 30 · TPM 70K)</option>
+                                        <option value="meta-llama/llama-prompt-guard-2-22m">Llama Prompt Guard 22M (RPM 30 · TPM 15K)</option>
+                                        <option value="meta-llama/llama-prompt-guard-2-86m">Llama Prompt Guard 86M (RPM 30 · TPM 15K)</option>
+                                        <option value="openai/gpt-oss-120b">GPT-OSS 120B (RPM 30 · TPM 8K)</option>
+                                        <option value="openai/gpt-oss-20b">GPT-OSS 20B (RPM 30 · TPM 8K)</option>
+                                        <option value="openai/gpt-oss-safeguard-20b">GPT-OSS Safeguard 20B (RPM 30 · TPM 8K)</option>
+                                        <option value="qwen/qwen3.6-27b">Qwen3.6 27B (RPM 30 · TPM 8K)</option>
+                                        <option value="qwen/qwen3.8-27b">Qwen3.8 27B (RPM 30 · TPM 8K)</option>
+                                        <option value="whisper-large-v3">Whisper Large V3 (RPM 20 · ASH 7.2K)</option>
+                                        <option value="whisper-large-v3-turbo">Whisper Large V3 Turbo (RPM 20 · ASH 7.2K)</option>
                                     </select>
                                 </div>
 
@@ -730,6 +726,48 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     )}
                 </section>
 
+
+                {/* Export Data */}
+                <div className="p-4 bg-white border border-slate-200 rounded-2xl">
+                    <div className="mb-3">
+                        <span className="text-sm font-bold text-slate-900">Экспорт данных</span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                            Скачать все сохранённые ссылки ({links.length}) в файл.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={links.length === 0}
+                            onClick={() => exportLinksAsJson(links)}
+                            icon={<FileJson className="w-4 h-4" />}
+                            className="w-full"
+                        >
+                            JSON
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={links.length === 0}
+                            onClick={() => exportLinksAsCsv(links)}
+                            icon={<FileSpreadsheet className="w-4 h-4" />}
+                            className="w-full"
+                        >
+                            CSV
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={links.length === 0}
+                            onClick={() => exportLinksAsMarkdown(links)}
+                            icon={<FileText className="w-4 h-4" />}
+                            className="w-full"
+                        >
+                            MD
+                        </Button>
+                    </div>
+                </div>
 
                 {/* Clear Cache */}
                 <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">

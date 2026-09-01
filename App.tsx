@@ -33,6 +33,7 @@ function getAnalyzingModelLabel(settings: AppSettings): string {
   const m = (s: string | undefined) => s || "";
   if (p === "google_gemini") {
     const id = m(settings.geminiModel);
+    if (id === "gemini-3.7-flash") return "Gemini 3.7 Flash";
     if (id === "gemini-2.5-flash") return "Gemini 2.5 Flash";
     if (id === "gemini-2.5-flash-lite") return "Gemini 2.5 Flash-Lite";
     if (id === "gemini-2.5-pro") return "Gemini 2.5 Pro";
@@ -41,44 +42,39 @@ function getAnalyzingModelLabel(settings: AppSettings): string {
   if (p === "groq") {
     const id = m(settings.groqModel);
     const labels: Record<string, string> = {
-      "llama-3.3-70b-versatile": "Llama 3.3 70B",
-      "llama-3.1-8b-instant": "Llama 3.1 8B",
-      "meta-llama/llama-4-scout-17b-16e-instruct": "Llama 4 Scout 17B",
+      "canopylabs/orpheus-v1-english": "Orpheus English",
+      "canopylabs/orpheus-arabic-saudi": "Orpheus Arabic",
+      "groq/compound": "Groq Compound",
+      "groq/compound-mini": "Groq Compound Mini",
+      "meta-llama/llama-prompt-guard-2-22m": "Llama Prompt Guard 22M",
+      "meta-llama/llama-prompt-guard-2-86m": "Llama Prompt Guard 86M",
       "openai/gpt-oss-120b": "GPT-OSS 120B",
       "openai/gpt-oss-20b": "GPT-OSS 20B",
       "openai/gpt-oss-safeguard-20b": "GPT-OSS Safeguard 20B",
-      "qwen/qwen3-32b": "Qwen3 32B",
-      "moonshotai/kimi-k2-instruct": "Kimi K2",
-      "moonshotai/kimi-k2-instruct-0905": "Kimi K2 (0905)",
-      "groq/compound": "Groq Compound",
-      "groq/compound-mini": "Groq Compound Mini",
-      "allam-2-7b": "Allam 2 7B",
-      "meta-llama/llama-prompt-guard-2-86m": "Llama Prompt Guard 86M",
-      "meta-llama/llama-prompt-guard-2-22m": "Llama Prompt Guard 22M",
-      "canopylabs/orpheus-v1-english": "Orpheus English",
-      "canopylabs/orpheus-arabic-saudi": "Orpheus Arabic",
+      "qwen/qwen3.6-27b": "Qwen3.6 27B",
+      "qwen/qwen3.8-27b": "Qwen3.8 27B",
+      "whisper-large-v3": "Whisper Large V3",
+      "whisper-large-v3-turbo": "Whisper Large V3 Turbo",
     };
     return labels[id] || id.split("/").pop()?.replace(/-/g, " ") || id;
   }
   if (p === "openrouter" || p === "cerebras") {
     const id = m(settings.openRouterModel);
     const labels: Record<string, string> = {
-      "stepfun/step-3.5-flash:free": "Step 3.5 Flash",
-      "openrouter/hunter-alpha": "Hunter Alpha",
-      "arcee-ai/trinity-large-preview:free": "Trinity Large",
+      "openrouter/free": "Free Models Router",
+      "z-ai/glm-5.2:free": "GLM 5.2",
+      "minimax/minimax-m3:free": "MiniMax M3",
+      "google/gemma-4-31b-it:free": "Gemma 4 31B",
+      "nvidia/nemotron-3-ultra-550b-a55b:free": "Nemotron 3 Ultra",
       "nvidia/nemotron-3-super-120b-a12b:free": "Nemotron 3 Super",
-      "openrouter/healer-alpha": "Healer Alpha",
-      "z-ai/glm-4.5-air:free": "GLM 4.5 Air",
-      "nvidia/nemotron-3-nano-30b-a3b:free": "Nemotron 3 Nano 30B",
-      "arcee-ai/trinity-mini:free": "Trinity Mini",
-      "nvidia/nemotron-nano-12b-v2-vl:free": "Nemotron Nano 12B VL",
-      "nvidia/nemotron-nano-9b-v2:free": "Nemotron Nano 9B V2",
-      "qwen/qwen3-coder:free": "Qwen3 Coder 480B",
-      "qwen/qwen3-next-80b-a3b-instruct:free": "Qwen3 Next 80B",
-      "meta-llama/llama-3.3-70b-instruct:free": "Llama 3.3 70B",
-      "openai/gpt-oss-120b:free": "gpt-oss-120b",
-      "liquid/lfm-2.5-1.2b-thinking:free": "LFM2.5-1.2B",
-      "mistralai/mistral-small-3.1-24b-instruct:free": "Mistral Small 3.1 24B",
+      "thinkingmachines/inkling:free": "Inkling",
+      "thinkingmachines/inkling-small:free": "Inkling Small",
+      "liquid/lfm-2.5-2.6b:free": "LFM2.5 2.6B",
+      "nvidia/nemotron-3.5-lightning:free": "Nemotron 3.5 Lightning",
+      "poolside/laguna-s-2.1:free": "Laguna S 2.1",
+      "minimax/minimax-m2.7:free": "MiniMax M2.7",
+      "google/gemma-4-26b-a4b-it:free": "Gemma 4 26B A4B",
+      "cohere/north-mini-code:free": "North Mini Code",
     };
     return (
       labels[id] ||
@@ -93,16 +89,88 @@ function getAnalyzingModelLabel(settings: AppSettings): string {
   if (p === "sambanova") {
     const id = m(settings.sambanovaModel);
     const labels: Record<string, string> = {
-      "DeepSeek-R1-0528": "DeepSeek R1-0528",
-      "DeepSeek-R1-Distill-Llama-70B": "DeepSeek R1 Distill Llama 70B",
-      "DeepSeek-V3-0324": "DeepSeek V3-0324",
-      "Deepseek-V3.1": "DeepSeek V3.1",
+      "DeepSeek-V3.1": "DeepSeek V3.1",
       "Meta-Llama-3.3-70B-Instruct": "Llama 3.3 70B",
-      "Meta-Llama-3.1-8B-Instruct": "Llama 3.1 8B",
+      "gpt-oss-120b": "GPT-OSS 120B",
     };
     return labels[id] || id || "SambaNova";
   }
   return "ИИ";
+}
+
+type AiAnalysisResult = { category: string; tags: string[]; summary: string };
+
+/** Единая точка выбора провайдера ИИ — используется и при захвате, и при повторном анализе. */
+async function runAiAnalysis(
+  metadata: PageMetadata,
+  settings: AppSettings,
+  categories: string[],
+): Promise<AiAnalysisResult> {
+  switch (settings.aiProvider) {
+    case "google_gemini":
+      return geminiAnalyze(
+        metadata,
+        settings.geminiApiKey,
+        categories,
+        settings.geminiModel,
+      );
+    case "groq":
+      return groqAnalyze(
+        metadata,
+        settings.groqApiKey,
+        categories,
+        settings.groqModel,
+      );
+    case "openrouter":
+      return openRouterAnalyze(
+        metadata,
+        settings.openRouterApiKey,
+        categories,
+        settings.openRouterModel,
+      );
+    case "sambanova":
+      return sambaAnalyze(
+        metadata,
+        settings.sambanovaApiKey,
+        categories,
+        settings.sambanovaModel,
+      );
+    case "cerebras":
+      return settings.cerebrasApiKey
+        ? cerebrasAnalyze(
+            metadata,
+            settings.cerebrasApiKey,
+            categories,
+            settings.cerebrasModel,
+          )
+        : openRouterAnalyze(
+            metadata,
+            settings.openRouterApiKey,
+            categories,
+            settings.openRouterModel,
+          );
+    default:
+      return cerebrasAnalyze(
+        metadata,
+        settings.cerebrasApiKey,
+        categories,
+        settings.cerebrasModel,
+      );
+  }
+}
+
+/** Сравнивает результат ИИ с текущими полями формы, чтобы подсветить изменённые. */
+function computeAiDiff(
+  aiData: AiAnalysisResult,
+  before: { category: string; tags: string[]; notes: string },
+) {
+  const finalCategory = (aiData.category || "").trim() || "Прочее";
+  const keys: Array<"category" | "tags" | "notes"> = [];
+  const tagsKey = (t: string[]) => t.join("|||");
+  if (finalCategory !== before.category) keys.push("category");
+  if (tagsKey(aiData.tags) !== tagsKey(before.tags)) keys.push("tags");
+  if (aiData.summary !== before.notes) keys.push("notes");
+  return { finalCategory, keys };
 }
 
 const App: React.FC = () => {
@@ -179,6 +247,35 @@ const App: React.FC = () => {
     aiUndoSnapshotRef.current = aiUndoSnapshot;
   }, [aiUndoSnapshot]);
 
+  // Запускает ИИ-анализ метаданных и применяет результат к форме (общая логика
+  // для автозахвата и ручного повторного анализа).
+  const applyAiAnalysis = useCallback(
+    async (targetMetadata: PageMetadata) => {
+      const before = formStateRef.current;
+      setAiUndoSnapshot({
+        category: before.category,
+        tags: [...before.tags],
+        notes: before.notes,
+      });
+
+      const aiData = await runAiAnalysis(targetMetadata, settings, categories);
+      const { finalCategory, keys } = computeAiDiff(aiData, before);
+
+      setAiChangedKeys(keys.length ? keys : null);
+      if (aiChangedTimeoutRef.current)
+        window.clearTimeout(aiChangedTimeoutRef.current);
+      if (keys.length)
+        aiChangedTimeoutRef.current = window.setTimeout(
+          () => setAiChangedKeys(null),
+          12000,
+        );
+      setCategory(finalCategory);
+      setTags(aiData.tags);
+      setNotes(aiData.summary);
+    },
+    [settings, categories],
+  );
+
   // Capture current tab (or context-menu tab/link) on mount
   const handleCapture = useCallback(
     async (options?: CaptureOptions) => {
@@ -204,84 +301,7 @@ const App: React.FC = () => {
           isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.ANALYZING,
         );
         try {
-          const before = formStateRef.current;
-          setAiUndoSnapshot({
-            category: before.category,
-            tags: [...before.tags],
-            notes: before.notes,
-          });
-          let aiData;
-          if (settings.aiProvider === "google_gemini") {
-            aiData = await geminiAnalyze(
-              extracted,
-              settings.geminiApiKey,
-              categories,
-              settings.geminiModel,
-            );
-          } else if (settings.aiProvider === "groq") {
-            aiData = await groqAnalyze(
-              extracted,
-              settings.groqApiKey,
-              categories,
-              settings.groqModel,
-            );
-          } else if (settings.aiProvider === "openrouter") {
-            aiData = await openRouterAnalyze(
-              extracted,
-              settings.openRouterApiKey,
-              categories,
-              settings.openRouterModel,
-            );
-          } else if (settings.aiProvider === "sambanova") {
-            aiData = await sambaAnalyze(
-              extracted,
-              settings.sambanovaApiKey,
-              categories,
-              settings.sambanovaModel,
-            );
-          } else if (settings.aiProvider === "cerebras") {
-            if (settings.cerebrasApiKey) {
-              aiData = await cerebrasAnalyze(
-                extracted,
-                settings.cerebrasApiKey,
-                categories,
-                settings.cerebrasModel,
-              );
-            } else {
-              aiData = await openRouterAnalyze(
-                extracted,
-                settings.openRouterApiKey,
-                categories,
-                settings.openRouterModel,
-              );
-            }
-          } else {
-            aiData = await cerebrasAnalyze(
-              extracted,
-              settings.cerebrasApiKey,
-              categories,
-              settings.cerebrasModel,
-            );
-          }
-          const nextCategory = (aiData.category || "").trim() || "Прочее";
-          const finalCategory = nextCategory;
-
-          const keys: Array<"category" | "tags" | "notes"> = [];
-          const tagsKey = (t: string[]) => t.join("|||");
-          if (finalCategory !== before.category) keys.push("category");
-          if (tagsKey(aiData.tags) !== tagsKey(before.tags)) keys.push("tags");
-          if (aiData.summary !== before.notes) keys.push("notes");
-          setAiChangedKeys(keys.length ? keys : null);
-          if (aiChangedTimeoutRef.current)
-            window.clearTimeout(aiChangedTimeoutRef.current);
-          if (keys.length)
-            aiChangedTimeoutRef.current = window.setTimeout(
-              () => setAiChangedKeys(null),
-              12000,
-            );
-          setCategory(finalCategory);
-          setTags(aiData.tags);
-          setNotes(aiData.summary);
+          await applyAiAnalysis(extracted);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Ошибка ИИ-анализа");
           setStatus(AppStatus.IDLE);
@@ -291,22 +311,7 @@ const App: React.FC = () => {
 
       setStatus(isAlreadySaved ? AppStatus.ALREADY_EXISTS : AppStatus.IDLE);
     },
-    [
-      captureTab,
-      settings.autoAiAnalysis,
-      settings.cerebrasApiKey,
-      settings.cerebrasModel,
-      settings.geminiApiKey,
-      settings.geminiModel,
-      settings.groqApiKey,
-      settings.groqModel,
-      settings.openRouterApiKey,
-      settings.openRouterModel,
-      settings.sambanovaApiKey,
-      settings.sambanovaModel,
-      settings.aiProvider,
-      categories,
-    ],
+    [captureTab, settings.autoAiAnalysis, applyAiAnalysis],
   );
 
   const handleReAnalyze = useCallback(async () => {
@@ -325,90 +330,13 @@ const App: React.FC = () => {
     setReAnalyzing(true);
     setError(null);
     try {
-      const before = formStateRef.current;
-      setAiUndoSnapshot({
-        category: before.category,
-        tags: [...before.tags],
-        notes: before.notes,
-      });
-      let aiData;
-      if (settings.aiProvider === "google_gemini") {
-        aiData = await geminiAnalyze(
-          metadata,
-          settings.geminiApiKey,
-          categories,
-          settings.geminiModel,
-        );
-      } else if (settings.aiProvider === "groq") {
-        aiData = await groqAnalyze(
-          metadata,
-          settings.groqApiKey,
-          categories,
-          settings.groqModel,
-        );
-      } else if (settings.aiProvider === "openrouter") {
-        aiData = await openRouterAnalyze(
-          metadata,
-          settings.openRouterApiKey,
-          categories,
-          settings.openRouterModel,
-        );
-      } else if (settings.aiProvider === "sambanova") {
-        aiData = await sambaAnalyze(
-          metadata,
-          settings.sambanovaApiKey,
-          categories,
-          settings.sambanovaModel,
-        );
-      } else if (settings.aiProvider === "cerebras") {
-        if (settings.cerebrasApiKey) {
-          aiData = await cerebrasAnalyze(
-            metadata,
-            settings.cerebrasApiKey,
-            categories,
-            settings.cerebrasModel,
-          );
-        } else {
-          aiData = await openRouterAnalyze(
-            metadata,
-            settings.openRouterApiKey,
-            categories,
-            settings.openRouterModel,
-          );
-        }
-      } else {
-        aiData = await cerebrasAnalyze(
-          metadata,
-          settings.cerebrasApiKey,
-          categories,
-          settings.cerebrasModel,
-        );
-      }
-      const nextCategory = (aiData.category || "").trim() || "Прочее";
-      const finalCategory = nextCategory;
-
-      const keys: Array<"category" | "tags" | "notes"> = [];
-      const tagsKey = (t: string[]) => t.join("|||");
-      if (finalCategory !== before.category) keys.push("category");
-      if (tagsKey(aiData.tags) !== tagsKey(before.tags)) keys.push("tags");
-      if (aiData.summary !== before.notes) keys.push("notes");
-      setAiChangedKeys(keys.length ? keys : null);
-      if (aiChangedTimeoutRef.current)
-        window.clearTimeout(aiChangedTimeoutRef.current);
-      if (keys.length)
-        aiChangedTimeoutRef.current = window.setTimeout(
-          () => setAiChangedKeys(null),
-          12000,
-        );
-      setCategory(finalCategory);
-      setTags(aiData.tags);
-      setNotes(aiData.summary);
+      await applyAiAnalysis(metadata);
     } catch (err: any) {
       setError(err?.message || "Ошибка ИИ-анализа");
     } finally {
       setReAnalyzing(false);
     }
-  }, [metadata, settings, categories]);
+  }, [metadata, settings, applyAiAnalysis]);
 
   const handleUndoAi = useCallback(() => {
     const snap = aiUndoSnapshotRef.current;
@@ -611,6 +539,7 @@ const App: React.FC = () => {
     return (
       <SettingsPage
         settings={settings}
+        links={savedLinks}
         onSettingsChange={setSettings}
         onSave={handleSaveSettings}
         onClearCache={handleClearCache}
